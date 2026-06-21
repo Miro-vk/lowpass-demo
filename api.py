@@ -3,10 +3,12 @@
 api.py — FastAPI server wrapping the digest logic.
 
 Endpoints:
-  POST /digest          — run digest for the authenticated user's topics
-  GET  /topics          — list the user's topics
-  POST /topics          — add a topic
-  DELETE /topics/{id}   — remove a topic
+  POST /auth/signup       — create a new account
+  POST /auth/login        — sign in, returns access_token
+  GET  /topics            — list the user's topics
+  POST /topics            — add a topic
+  DELETE /topics/{id}     — remove a topic
+  POST /digest            — run digest for the authenticated user's topics
 """
 
 import os
@@ -22,7 +24,6 @@ from digest import (
     fetch_reddit, fetch_hn, fetch_youtube, fetch_x,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
-    print_clusters,
 )
 
 app = FastAPI(title="Lowpass Digest API")
@@ -32,26 +33,61 @@ SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 
 
 # ---------------------------------------------------------------------------
-# Auth helper
+# Auth
 # ---------------------------------------------------------------------------
 
-def get_supabase(authorization: str = Header(...)) -> Client:
-    """Return a Supabase client scoped to the requesting user's JWT."""
+class AuthIn(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/auth/signup", status_code=201)
+def signup(body: AuthIn):
+    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    try:
+        sb.auth.sign_up({"email": body.email, "password": body.password})
+        return {"message": "Account created. Check your email to confirm before logging in."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/auth/login")
+def login(body: AuthIn):
+    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    try:
+        res = sb.auth.sign_in_with_password({"email": body.email, "password": body.password})
+        return {
+            "access_token": res.session.access_token,
+            "token_type": "bearer",
+        }
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+
+class AuthedUser:
+    def __init__(self, user_id: str, sb: Client):
+        self.user_id = user_id
+        self.sb = sb
+
+
+def get_current_user(authorization: str = Header(...)) -> AuthedUser:
+    """Validate the Bearer token and return a Supabase client scoped to that user."""
     token = authorization.removeprefix("Bearer ").strip()
-    client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    client.auth.set_session(token, "")
-    return client
-
-
-def current_user_id(sb: Client) -> str:
-    user = sb.auth.get_user()
-    if not user or not user.user:
+    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    try:
+        res = sb.auth.get_user(token)
+        if not res or not res.user:
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
+    except HTTPException:
+        raise
+    except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return user.user.id
+    sb.postgrest.auth(token)
+    return AuthedUser(user_id=res.user.id, sb=sb)
 
 
 # ---------------------------------------------------------------------------
-# Seen cache (Supabase-backed, replaces ~/.lowpass_seen.json)
+# Seen cache (Supabase-backed)
 # ---------------------------------------------------------------------------
 
 def load_seen_db(sb: Client, user_id: str) -> set:
@@ -74,25 +110,22 @@ class TopicIn(BaseModel):
 
 
 @app.get("/topics")
-def list_topics(sb: Client = Depends(get_supabase)):
-    uid = current_user_id(sb)
-    rows = sb.table("topics").select("*").eq("user_id", uid).execute()
+def list_topics(user: AuthedUser = Depends(get_current_user)):
+    rows = user.sb.table("topics").select("*").eq("user_id", user.user_id).execute()
     return rows.data
 
 
 @app.post("/topics", status_code=201)
-def add_topic(body: TopicIn, sb: Client = Depends(get_supabase)):
-    uid = current_user_id(sb)
-    row = sb.table("topics").insert({
-        "user_id": uid, "query": body.query, "focus": body.focus
+def add_topic(body: TopicIn, user: AuthedUser = Depends(get_current_user)):
+    row = user.sb.table("topics").insert({
+        "user_id": user.user_id, "query": body.query, "focus": body.focus
     }).execute()
     return row.data[0]
 
 
 @app.delete("/topics/{topic_id}", status_code=204)
-def delete_topic(topic_id: str, sb: Client = Depends(get_supabase)):
-    uid = current_user_id(sb)
-    sb.table("topics").delete().eq("id", topic_id).eq("user_id", uid).execute()
+def delete_topic(topic_id: str, user: AuthedUser = Depends(get_current_user)):
+    user.sb.table("topics").delete().eq("id", topic_id).eq("user_id", user.user_id).execute()
 
 
 # ---------------------------------------------------------------------------
@@ -115,19 +148,17 @@ class DigestResponse(BaseModel):
 
 
 @app.post("/digest", response_model=list[DigestResponse])
-def run_digest(limit: int = 10, sb: Client = Depends(get_supabase)):
-    uid = current_user_id(sb)
-
-    topics = sb.table("topics").select("*").eq("user_id", uid).execute().data
+def run_digest(limit: int = 10, user: AuthedUser = Depends(get_current_user)):
+    topics = user.sb.table("topics").select("*").eq("user_id", user.user_id).execute().data
     if not topics:
-        raise HTTPException(status_code=404, detail="No topics configured for this user")
+        raise HTTPException(status_code=404, detail="No topics configured. Add one via POST /topics first.")
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured on server")
 
     claude = anthropic.Anthropic(api_key=api_key)
-    seen = load_seen_db(sb, uid)
+    seen = load_seen_db(user.sb, user.user_id)
     results = []
 
     for entry in topics:
@@ -167,7 +198,7 @@ def run_digest(limit: int = 10, sb: Client = Depends(get_supabase)):
                 summary=summary,
             ))
 
-        mark_seen_db(sb, uid, top)
+        mark_seen_db(user.sb, user.user_id, top)
 
         themes = synthesize_digest(claude, summaries, topic) if len(summaries) > 1 else ""
         results.append(DigestResponse(topic=topic, clusters=cluster_out, themes=themes))
