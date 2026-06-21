@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert,
+  StyleSheet, ActivityIndicator, Alert, Linking,
 } from "react-native";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -41,19 +41,9 @@ export default function DigestScreen({ navigation }: any) {
     }
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>← Topics</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Digest</Text>
-        <TouchableOpacity onPress={handleRun} disabled={loading}>
-          <Text style={styles.run}>{loading ? "..." : "Run"}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {loading && (
+  function renderBody() {
+    if (loading) {
+      return (
         <View style={styles.center}>
           <ActivityIndicator size="large" />
           <Text style={styles.loadingText}>Fetching and summarising…</Text>
@@ -61,21 +51,24 @@ export default function DigestScreen({ navigation }: any) {
             If this is your first request in a while,{"\n"}the server may take ~30s to wake up.
           </Text>
         </View>
-      )}
-
-      {!loading && !ran && (
+      );
+    }
+    if (!ran) {
+      return (
         <View style={styles.center}>
           <Text style={styles.empty}>Tap Run to generate your digest</Text>
         </View>
-      )}
-
-      {!loading && ran && results.length === 0 && (
+      );
+    }
+    if (results.length === 0) {
+      return (
         <View style={styles.center}>
           <Text style={styles.empty}>Nothing new since your last run.</Text>
         </View>
-      )}
-
-      <ScrollView>
+      );
+    }
+    return (
+      <ScrollView contentContainerStyle={styles.scroll}>
         {results.map((result) => (
           <View key={result.topic} style={styles.section}>
             <Text style={styles.topicLabel}>{result.topic}</Text>
@@ -87,7 +80,9 @@ export default function DigestScreen({ navigation }: any) {
                   <Text style={styles.sources}>{cluster.sources.join(" + ")}</Text>
                   <Text style={styles.score}>{cluster.composite_score}</Text>
                 </View>
-                <Text style={styles.clusterTitle}>{cluster.title}</Text>
+                <TouchableOpacity onPress={() => Linking.openURL(cluster.url)}>
+                  <Text style={styles.clusterTitle}>{cluster.title}</Text>
+                </TouchableOpacity>
                 <Text style={styles.summary}>{cluster.summary}</Text>
               </View>
             ))}
@@ -101,6 +96,22 @@ export default function DigestScreen({ navigation }: any) {
           </View>
         ))}
       </ScrollView>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Text style={styles.back}>← Topics</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Digest</Text>
+        <TouchableOpacity onPress={handleRun} disabled={loading}>
+          <Text style={[styles.run, loading && styles.runDisabled]}>Run</Text>
+        </TouchableOpacity>
+      </View>
+
+      {renderBody()}
     </View>
   );
 }
@@ -114,10 +125,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: "700" },
   back: { color: "#555", fontSize: 15 },
   run: { color: "#000", fontSize: 15, fontWeight: "600" },
+  runDisabled: { color: "#ccc" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
   loadingText: { marginTop: 12, color: "#888", fontSize: 14 },
   loadingHint: { marginTop: 8, color: "#bbb", fontSize: 12, textAlign: "center" },
   empty: { color: "#aaa", fontSize: 15 },
+  scroll: { paddingBottom: 32 },
   section: { marginBottom: 24 },
   topicLabel: {
     fontSize: 13, fontWeight: "700", color: "#888",
@@ -132,7 +145,7 @@ const styles = StyleSheet.create({
   rank: { fontWeight: "700", fontSize: 13, marginRight: 8 },
   sources: { flex: 1, fontSize: 12, color: "#888" },
   score: { fontSize: 12, color: "#aaa" },
-  clusterTitle: { fontSize: 15, fontWeight: "600", marginBottom: 6 },
+  clusterTitle: { fontSize: 15, fontWeight: "600", marginBottom: 6, color: "#1a0dab" },
   summary: { fontSize: 14, color: "#444", lineHeight: 20 },
   themes: {
     marginHorizontal: 16, backgroundColor: "#f8f8f8",
