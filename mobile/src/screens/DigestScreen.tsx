@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert,
@@ -57,6 +57,9 @@ export default function DigestScreen({ navigation }: any) {
         <View style={styles.center}>
           <ActivityIndicator size="large" />
           <Text style={styles.loadingText}>Fetching and summarising…</Text>
+          <Text style={styles.loadingHint}>
+            If this is your first request in a while,{"\n"}the server may take ~30s to wake up.
+          </Text>
         </View>
       )}
 
@@ -113,6 +116,7 @@ const styles = StyleSheet.create({
   run: { color: "#000", fontSize: 15, fontWeight: "600" },
   center: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
   loadingText: { marginTop: 12, color: "#888", fontSize: 14 },
+  loadingHint: { marginTop: 8, color: "#bbb", fontSize: 12, textAlign: "center" },
   empty: { color: "#aaa", fontSize: 15 },
   section: { marginBottom: 24 },
   topicLabel: {
