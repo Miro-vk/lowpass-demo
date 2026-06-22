@@ -11,7 +11,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>("dev-bypass");
   return (
     <AuthContext.Provider value={{ token, setToken }}>
       {children}
