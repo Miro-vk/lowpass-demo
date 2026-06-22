@@ -94,14 +94,14 @@ export default function DigestScreen() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Logo */}
+          {/* Spacer pushes everything lower */}
+          <View style={{ height: SCREEN_H * 0.22 }} />
+
+          {/* Logo sits right above input */}
           <View style={styles.logo}>
             <LowpassIcon size={32} />
             <Text style={styles.logoText}>LOWPASS</Text>
           </View>
-
-          {/* Spacer pushes input above center */}
-          <View style={{ height: SCREEN_H * 0.12 }} />
 
           {/* Input area */}
           <View style={styles.inputSection}>
@@ -126,10 +126,10 @@ export default function DigestScreen() {
               {loading ? (
                 <View style={styles.runBtnInner}>
                   <ActivityIndicator color={C.bg} size="small" />
-                  <Text style={styles.runBtnText}>RUNNING…</Text>
+                  <Text style={styles.runBtnText}>FILTERING…</Text>
                 </View>
               ) : (
-                <Text style={styles.runBtnText}>RUN DIGEST →</Text>
+                <Text style={styles.runBtnText}>FILTER THE NOISE</Text>
               )}
             </TouchableOpacity>
             {loading && (
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingTop: 16,
+    marginBottom: 16,
   },
   logoText: {
     fontSize: 20,
