@@ -22,11 +22,11 @@ const C = {
   accent: "#0A0A0A",
 };
 
-function LowpassIcon({ size = 28 }: { size?: number }) {
+function LowpassIcon({ size = 52 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 1024 1024">
-      <Rect width="1024" height="1024" rx="220" fill={C.black} />
-      <G fill="#FAFAF8" opacity={0.35}>
+      <Rect width="1024" height="1024" rx="220" fill="#FAFAF8" />
+      <G fill="#1A1A1A" opacity={0.35}>
         <Circle cx={246} cy={318} r={24} />
         <Circle cx={386} cy={252} r={29} />
         <Circle cx={544} cy={299} r={24} />
@@ -39,7 +39,7 @@ function LowpassIcon({ size = 28 }: { size?: number }) {
       </G>
       <Path
         d="M 196 516 L 504 824 L 504 910 L 580 910 L 580 824 L 888 516"
-        fill="none" stroke="#FAFAF8" strokeWidth={44}
+        fill="none" stroke="#1A1A1A" strokeWidth={44}
         strokeLinejoin="round" strokeLinecap="round"
       />
       <Circle cx={540} cy={970} r={38} fill="#F5B82E" />
@@ -99,7 +99,9 @@ export default function DigestScreen() {
 
           {/* Logo sits right above input */}
           <View style={styles.logo}>
-            <LowpassIcon size={32} />
+            <View style={styles.iconWrap}>
+              <LowpassIcon size={52} />
+            </View>
             <Text style={styles.logoText}>LOWPASS</Text>
           </View>
 
@@ -206,8 +208,14 @@ const styles = StyleSheet.create({
   logo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     marginBottom: 16,
+  },
+  iconWrap: {
+    borderWidth: 2,
+    borderColor: C.black,
+    borderRadius: 12,
+    overflow: "hidden",
   },
   logoText: {
     fontSize: 20,
