@@ -99,9 +99,7 @@ export default function DigestScreen() {
 
           {/* Logo sits right above input */}
           <View style={styles.logo}>
-            <View style={styles.iconWrap}>
-              <LowpassIcon size={52} />
-            </View>
+            <LowpassIcon size={72} />
             <Text style={styles.logoText}>LOWPASS</Text>
           </View>
 
@@ -211,17 +209,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
-  iconWrap: {
-    borderWidth: 2,
-    borderColor: C.black,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
   logoText: {
-    fontSize: 20,
+    fontSize: 32,
     fontWeight: "900",
     color: C.black,
-    letterSpacing: 4,
+    letterSpacing: 6,
   },
 
   inputSection: { marginBottom: 24 },
