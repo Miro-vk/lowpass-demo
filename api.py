@@ -101,36 +101,13 @@ def mark_seen_db(sb: Client, user_id: str, clusters: list) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Topics endpoints
-# ---------------------------------------------------------------------------
-
-class TopicIn(BaseModel):
-    query: str
-    focus: str = ""
-
-
-@app.get("/topics")
-def list_topics(user: AuthedUser = Depends(get_current_user)):
-    rows = user.sb.table("topics").select("*").eq("user_id", user.user_id).execute()
-    return rows.data
-
-
-@app.post("/topics", status_code=201)
-def add_topic(body: TopicIn, user: AuthedUser = Depends(get_current_user)):
-    row = user.sb.table("topics").insert({
-        "user_id": user.user_id, "query": body.query, "focus": body.focus
-    }).execute()
-    return row.data[0]
-
-
-@app.delete("/topics/{topic_id}", status_code=204)
-def delete_topic(topic_id: str, user: AuthedUser = Depends(get_current_user)):
-    user.sb.table("topics").delete().eq("id", topic_id).eq("user_id", user.user_id).execute()
-
-
-# ---------------------------------------------------------------------------
 # Digest endpoint
 # ---------------------------------------------------------------------------
+
+class DigestIn(BaseModel):
+    topic: str
+    focus: str = ""
+
 
 class ClusterSummary(BaseModel):
     rank: int
@@ -148,59 +125,41 @@ class DigestResponse(BaseModel):
 
 
 @app.post("/digest", response_model=list[DigestResponse])
-def run_digest(limit: int = 10, user: AuthedUser = Depends(get_current_user)):
-    topics = user.sb.table("topics").select("*").eq("user_id", user.user_id).execute().data
-    if not topics:
-        raise HTTPException(status_code=404, detail="No topics configured. Add one via POST /topics first.")
-
+def run_digest(body: DigestIn, user: AuthedUser = Depends(get_current_user)):
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured on server")
 
     claude = anthropic.Anthropic(api_key=api_key)
-    seen = load_seen_db(user.sb, user.user_id)
-    results = []
 
-    for entry in topics:
-        topic = entry["query"]
-        focus = entry.get("focus") or ""
+    all_posts = (
+        fetch_reddit(body.topic, 10) +
+        fetch_hn(body.topic, 10) +
+        fetch_youtube(body.topic, 10) +
+        fetch_x(body.topic, 10)
+    )
+    if not all_posts:
+        raise HTTPException(status_code=404, detail=f"No posts found for '{body.topic}'")
 
-        all_posts = (
-            fetch_reddit(topic, limit) +
-            fetch_hn(topic, limit) +
-            fetch_youtube(topic, limit) +
-            fetch_x(topic, limit)
-        )
-        if not all_posts:
-            continue
+    clusters = cluster_posts(all_posts)
+    ranked = sorted(clusters, key=score_cluster, reverse=True)
+    top = ranked[:5]
 
-        clusters = cluster_posts(all_posts)
-        ranked = sorted(clusters, key=score_cluster, reverse=True)
-        new_clusters = [c for c in ranked if _cluster_key(c) not in seen]
+    summaries = []
+    cluster_out = []
 
-        if not new_clusters:
-            continue
+    for rank, cluster in enumerate(top, start=1):
+        rep = _cluster_representative(cluster)
+        summary = synthesize_cluster(claude, cluster, rank, body.focus)
+        summaries.append((rank, summary))
+        cluster_out.append(ClusterSummary(
+            rank=rank,
+            title=rep["title"] or "",
+            url=rep["url"],
+            sources=sorted({p["source"] for p in cluster}),
+            composite_score=round(score_cluster(cluster), 1),
+            summary=summary,
+        ))
 
-        top = new_clusters[:5]
-        summaries = []
-        cluster_out = []
-
-        for rank, cluster in enumerate(top, start=1):
-            rep = _cluster_representative(cluster)
-            summary = synthesize_cluster(claude, cluster, rank, focus)
-            summaries.append((rank, summary))
-            cluster_out.append(ClusterSummary(
-                rank=rank,
-                title=rep["title"] or "",
-                url=rep["url"],
-                sources=sorted({p["source"] for p in cluster}),
-                composite_score=round(score_cluster(cluster), 1),
-                summary=summary,
-            ))
-
-        mark_seen_db(user.sb, user.user_id, top)
-
-        themes = synthesize_digest(claude, summaries, topic) if len(summaries) > 1 else ""
-        results.append(DigestResponse(topic=topic, clusters=cluster_out, themes=themes))
-
-    return results
+    themes = synthesize_digest(claude, summaries, body.topic) if len(summaries) > 1 else ""
+    return [DigestResponse(topic=body.topic, clusters=cluster_out, themes=themes)]

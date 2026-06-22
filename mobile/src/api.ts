@@ -60,6 +60,9 @@ export const api = {
   deleteTopic: (token: string, id: string) =>
     request(`/topics/${id}`, token, { method: "DELETE" }),
 
-  runDigest: (token: string) =>
-    request("/digest", token, { method: "POST" }),
+  runDigest: (token: string, topic: string, focus: string = "") =>
+    request("/digest", token, {
+      method: "POST",
+      body: JSON.stringify({ topic, focus }),
+    }),
 };
