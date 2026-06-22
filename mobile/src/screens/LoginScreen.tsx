@@ -1,10 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import LowpassIcon from "../components/LowpassIcon";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
+
+const C = { bg: "#F5F4EF", white: "#FFFFFF", black: "#0A0A0A", muted: "#888" };
 
 export default function LoginScreen({ navigation }: any) {
   const { setToken } = useAuth();
@@ -26,49 +30,99 @@ export default function LoginScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Lowpass</Text>
-      <Text style={styles.subtitle}>Your personal topic digest</Text>
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+          <View style={styles.logo}>
+            <LowpassIcon size={72} />
+            <Text style={styles.logoText}>LOWPASS</Text>
+          </View>
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Log in</Text>}
-      </TouchableOpacity>
+          <Text style={styles.tagline}>Filter the noise.</Text>
 
-      <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
-        <Text style={styles.link}>No account? Sign up</Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.form}>
+            <Text style={styles.label}>EMAIL</Text>
+            <View style={styles.inputShadow}>
+              <TextInput
+                style={styles.input}
+                placeholder="you@example.com"
+                placeholderTextColor={C.muted}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+              />
+            </View>
+
+            <Text style={styles.label}>PASSWORD</Text>
+            <View style={styles.inputShadow}>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={C.muted}
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                onSubmitEditing={handleLogin}
+                returnKeyType="go"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.btn, loading && styles.btnDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading
+                ? <ActivityIndicator color={C.bg} />
+                : <Text style={styles.btnText}>LOG IN</Text>}
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
+            <Text style={styles.switchText}>
+              No account? <Text style={styles.switchLink}>Sign up</Text>
+            </Text>
+          </TouchableOpacity>
+
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 24, backgroundColor: "#fff" },
-  title: { fontSize: 32, fontWeight: "700", textAlign: "center", marginBottom: 4 },
-  subtitle: { fontSize: 14, color: "#888", textAlign: "center", marginBottom: 32 },
+  safe: { flex: 1, backgroundColor: C.bg },
+  container: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 60, paddingBottom: 40 },
+
+  logo: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  logoText: { fontSize: 32, fontWeight: "900", color: C.black, letterSpacing: 6 },
+  tagline: { fontSize: 14, color: C.muted, letterSpacing: 1, marginBottom: 48 },
+
+  form: { marginBottom: 32 },
+  label: {
+    fontSize: 11, fontWeight: "900", color: C.black,
+    letterSpacing: 2, marginBottom: 6, marginTop: 16,
+  },
+  inputShadow: {
+    shadowColor: C.black, shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1, shadowRadius: 0, elevation: 4,
+  },
   input: {
-    borderWidth: 1, borderColor: "#ddd", borderRadius: 8,
-    padding: 12, marginBottom: 12, fontSize: 16,
+    backgroundColor: C.white, borderWidth: 2, borderColor: C.black,
+    padding: 16, fontSize: 15, color: C.black,
   },
-  button: {
-    backgroundColor: "#000", borderRadius: 8,
-    padding: 14, alignItems: "center", marginBottom: 16,
+  btn: {
+    backgroundColor: C.black, borderWidth: 2, borderColor: C.black,
+    padding: 16, alignItems: "center", marginTop: 24,
+    shadowColor: C.black, shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 1, shadowRadius: 0, elevation: 4,
   },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  link: { textAlign: "center", color: "#555", textDecorationLine: "underline" },
+  btnDisabled: { opacity: 0.6 },
+  btnText: { color: C.bg, fontWeight: "900", fontSize: 14, letterSpacing: 2 },
+
+  switchText: { textAlign: "center", color: C.muted, fontSize: 14 },
+  switchLink: { color: C.black, fontWeight: "700", textDecorationLine: "underline" },
 });

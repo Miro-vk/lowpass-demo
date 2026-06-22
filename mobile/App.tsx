@@ -10,13 +10,14 @@ import LoginScreen from "./src/screens/LoginScreen";
 import SignupScreen from "./src/screens/SignupScreen";
 import DigestScreen from "./src/screens/DigestScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
+import CardSwipeScreen from "./src/screens/CardSwipeScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const C = { bg: "#F5F4EF", black: "#0A0A0A", muted: "#888" };
 
-function TabBar({ state, descriptors, navigation }: any) {
+function TabBar({ state, navigation }: any) {
   return (
     <View style={styles.tabBar}>
       {state.routes.map((route: any, index: number) => {
@@ -40,6 +41,7 @@ function MainTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Chats" component={DigestScreen} />
+      <Tab.Screen name="Cards" component={CardSwipeScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
     </Tab.Navigator>
   );

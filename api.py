@@ -22,9 +22,12 @@ from supabase import create_client, Client
 
 from digest import (
     fetch_reddit, fetch_hn, fetch_youtube, fetch_x,
+    fetch_reddit_trending, fetch_hn_trending,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
 )
+
+CLAUDE_MODEL = "claude-opus-4-8"
 
 app = FastAPI(title="Lowpass Digest API")
 
@@ -163,3 +166,80 @@ def run_digest(body: DigestIn, user: AuthedUser = Depends(get_current_user)):
 
     themes = synthesize_digest(claude, summaries, body.topic) if len(summaries) > 1 else ""
     return [DigestResponse(topic=body.topic, clusters=cluster_out, themes=themes)]
+
+
+# ---------------------------------------------------------------------------
+# Cards endpoints
+# ---------------------------------------------------------------------------
+
+class CardItem(BaseModel):
+    id: str
+    title: str
+    snippet: str
+
+
+class SummarizeCardsIn(BaseModel):
+    cards: list[dict]
+
+
+@app.get("/cards/daily", response_model=list[CardItem])
+def get_daily_cards():
+    """Top 10 most-engaged stories from the past 24 hours. No auth required."""
+    reddit_posts = fetch_reddit_trending(25)
+    hn_posts = fetch_hn_trending(25)
+    all_posts = reddit_posts + hn_posts
+
+    if not all_posts:
+        raise HTTPException(status_code=503, detail="Could not fetch stories right now")
+
+    clusters = cluster_posts(all_posts)
+    ranked = sorted(clusters, key=score_cluster, reverse=True)[:10]
+
+    cards = []
+    for i, cluster in enumerate(ranked):
+        rep = _cluster_representative(cluster)
+        snippet = (rep.get("selftext") or "").strip()
+        if len(snippet) > 300:
+            snippet = snippet[:300].rsplit(" ", 1)[0] + "…"
+        cards.append(CardItem(
+            id=str(i),
+            title=rep.get("title") or "",
+            snippet=snippet,
+        ))
+
+    return cards
+
+
+@app.post("/cards/summarize")
+def summarize_saved_cards(body: SummarizeCardsIn):
+    """Summarize swiped-right cards into a brief report. No auth required."""
+    if not body.cards:
+        raise HTTPException(status_code=400, detail="No cards to summarize")
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured on server")
+
+    claude = anthropic.Anthropic(api_key=api_key)
+
+    stories_text = "\n\n".join(
+        f"Story {i + 1}: {c.get('title', '')}\n{c.get('snippet', '') or '(no excerpt)'}"
+        for i, c in enumerate(body.cards)
+    )
+
+    prompt = (
+        f"The user saved {len(body.cards)} stories today. Write a concise, engaging briefing "
+        f"(5–8 sentences) that ties these stories together — highlight patterns, tensions, or "
+        f"big-picture themes worth paying attention to. Write in a clear, intelligent tone like "
+        f"a trusted analyst. Flowing prose only, no bullet points.\n\n"
+        f"STORIES:\n{stories_text}\n\nBRIEFING:"
+    )
+
+    with claude.messages.stream(
+        model=CLAUDE_MODEL,
+        max_tokens=500,
+        messages=[{"role": "user", "content": prompt}],
+    ) as stream:
+        report = stream.get_final_message().content[0].text.strip()
+
+    return {"report": report}

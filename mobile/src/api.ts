@@ -65,4 +65,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ topic, focus }),
     }),
+
+  getDailyCards: (): Promise<{ id: string; title: string; snippet: string }[]> =>
+    request("/cards/daily"),
+
+  summarizeCards: (cards: { title: string; snippet: string }[]): Promise<{ report: string }> =>
+    request("/cards/summarize", undefined, {
+      method: "POST",
+      body: JSON.stringify({ cards }),
+    }),
 };

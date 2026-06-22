@@ -47,6 +47,68 @@ TOPICS_CONFIG = Path("topics.yaml")
 # Fetchers
 # ---------------------------------------------------------------------------
 
+def fetch_reddit_trending(limit: int = 25):
+    """Top posts from r/popular in the past 24 hours — no topic query."""
+    try:
+        resp = requests.get(
+            "https://www.reddit.com/r/popular/top.json",
+            headers=HEADERS,
+            params={"t": "day", "limit": limit},
+            timeout=10,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[reddit] trending fetch failed: {e}", file=sys.stderr)
+        return []
+
+    posts = []
+    for child in resp.json().get("data", {}).get("children", []):
+        d = child.get("data", {})
+        posts.append({
+            "source": "reddit",
+            "title": d.get("title"),
+            "subreddit": d.get("subreddit"),
+            "score": d.get("score", 0),
+            "num_comments": d.get("num_comments", 0),
+            "url": f"https://reddit.com{d.get('permalink', '')}",
+            "created_utc": d.get("created_utc"),
+            "selftext": (d.get("selftext") or "")[:500],
+        })
+    return posts
+
+
+def fetch_hn_trending(limit: int = 25):
+    """Top HN stories posted in the past 24 hours, sorted by points."""
+    import time
+    since = int(time.time()) - 86400
+    params = {
+        "tags": "story",
+        "numericFilters": f"created_at_i>{since}",
+        "hitsPerPage": limit,
+    }
+    try:
+        resp = requests.get(HN_SEARCH_URL, params=params, timeout=10)
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[hn] trending fetch failed: {e}", file=sys.stderr)
+        return []
+
+    posts = []
+    for hit in resp.json().get("hits", []):
+        posts.append({
+            "source": "hackernews",
+            "title": hit.get("title"),
+            "score": hit.get("points", 0),
+            "num_comments": hit.get("num_comments", 0),
+            "url": hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID')}",
+            "created_utc": hit.get("created_at_i"),
+            "selftext": "",
+        })
+    # Sort by raw engagement (points + 2 * comments) since all are recent
+    posts.sort(key=lambda p: p["score"] + 2 * p["num_comments"], reverse=True)
+    return posts
+
+
 def fetch_reddit(topic: str, limit: int = 10):
     params = {"q": topic, "sort": "top", "t": "month", "limit": limit}
     try:
