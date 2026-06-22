@@ -67,7 +67,7 @@ export const api = {
       body: JSON.stringify({ topic, focus }),
     }),
 
-  getDailyCards: (): Promise<{ id: string; title: string; snippet: string }[]> =>
+  getDailyCards: (): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>
     request("/cards/daily"),
 
   summarizeCards: (cards: { title: string; snippet: string }[]): Promise<{ report: string }> =>

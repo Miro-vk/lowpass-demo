@@ -18,7 +18,7 @@ const C = {
   no: "#B71C1C",
 };
 
-type NewsCard = { id: string; title: string; snippet: string };
+type NewsCard = { id: string; title: string; tag: string; snippet: string };
 
 export default function CardSwipeScreen() {
   const swiperRef = useRef<Swiper<NewsCard>>(null);
@@ -162,13 +162,14 @@ export default function CardSwipeScreen() {
           renderCard={(card) => (
             <View style={styles.cardShadow}>
               <View style={styles.card}>
+                <View style={styles.tagWrap}>
+                  <Text style={styles.tag}>{card.tag}</Text>
+                </View>
                 <Text style={styles.cardTitle}>{card.title}</Text>
-                {card.snippet ? (
-                  <>
-                    <View style={styles.divider} />
-                    <Text style={styles.cardSnippet}>{card.snippet}</Text>
-                  </>
-                ) : null}
+                <View style={styles.divider} />
+                <Text style={styles.cardSnippet}>
+                  {card.snippet || "Trending story from the past 24 hours."}
+                </Text>
               </View>
             </View>
           )}
@@ -295,12 +296,20 @@ const styles = StyleSheet.create({
     padding: 24,
     minHeight: H * 0.5,
   },
+  tagWrap: {
+    alignSelf: "flex-start",
+    backgroundColor: C.black,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  tag: { fontSize: 10, fontWeight: "900", color: C.bg, letterSpacing: 2 },
   cardTitle: {
-    fontSize: 22,
+    fontSize: 21,
     fontWeight: "900",
     color: C.black,
-    lineHeight: 30,
-    marginBottom: 20,
+    lineHeight: 29,
+    marginBottom: 18,
   },
   divider: { height: 2, backgroundColor: C.black, marginBottom: 18 },
   cardSnippet: { fontSize: 14, color: "#333", lineHeight: 23 },

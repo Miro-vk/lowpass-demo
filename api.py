@@ -175,6 +175,7 @@ def run_digest(body: DigestIn, user: AuthedUser = Depends(get_current_user)):
 class CardItem(BaseModel):
     id: str
     title: str
+    tag: str
     snippet: str
 
 
@@ -182,9 +183,14 @@ class SummarizeCardsIn(BaseModel):
     cards: list[dict]
 
 
+_VALID_TAGS = {"AI", "TECH", "SCIENCE", "BUSINESS", "POLICY", "WORLD", "HEALTH", "CULTURE", "SECURITY", "OTHER"}
+
+
 @app.get("/cards/daily", response_model=list[CardItem])
 def get_daily_cards():
     """Top 10 most-engaged stories from the past 24 hours. No auth required."""
+    import json as _json
+
     reddit_posts = fetch_reddit_trending(25)
     hn_posts = fetch_hn_trending(25)
     all_posts = reddit_posts + hn_posts
@@ -195,31 +201,38 @@ def get_daily_cards():
     clusters = cluster_posts(all_posts)
     ranked = sorted(clusters, key=score_cluster, reverse=True)[:10]
 
-    # Build title list for Claude to annotate in one call
     titles = [_cluster_representative(c).get("title") or "" for c in ranked]
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    snippets = [""] * len(titles)
+    annotations = [{"tag": "OTHER", "snippet": ""}] * len(titles)
+
     if api_key:
         claude = anthropic.Anthropic(api_key=api_key)
         prompt = (
-            "For each story title below, write exactly ONE sentence (max 20 words) that explains "
-            "why this story matters or what it's about. Be direct and informative, no fluff. "
-            "Return ONLY the sentences, one per line, in the same order.\n\n"
+            "For each story title, return a JSON array (one object per story, same order).\n"
+            "Each object must have:\n"
+            '  "tag": one of AI, TECH, SCIENCE, BUSINESS, POLICY, WORLD, HEALTH, CULTURE, SECURITY, OTHER\n'
+            '  "snippet": one sentence (max 25 words) explaining why this story matters\n\n'
+            "Return ONLY valid JSON, no markdown, no explanation.\n\n"
+            "TITLES:\n"
             + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
         )
         try:
             with claude.messages.stream(
                 model=CLAUDE_MODEL,
-                max_tokens=400,
+                max_tokens=600,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
-                lines = stream.get_final_message().content[0].text.strip().splitlines()
-            # Strip leading "1. " numbering if Claude included it
-            for i, line in enumerate(lines[:len(titles)]):
-                snippets[i] = line.lstrip("0123456789. ").strip()
+                raw = stream.get_final_message().content[0].text.strip()
+            parsed = _json.loads(raw)
+            for i, obj in enumerate(parsed[:len(titles)]):
+                tag = (obj.get("tag") or "OTHER").upper()
+                annotations[i] = {
+                    "tag": tag if tag in _VALID_TAGS else "OTHER",
+                    "snippet": (obj.get("snippet") or "").strip(),
+                }
         except Exception:
-            pass  # Fall back to empty snippets
+            pass  # Fall back to defaults
 
     cards = []
     for i, cluster in enumerate(ranked):
@@ -227,7 +240,8 @@ def get_daily_cards():
         cards.append(CardItem(
             id=str(i),
             title=rep.get("title") or "",
-            snippet=snippets[i],
+            tag=annotations[i]["tag"],
+            snippet=annotations[i]["snippet"],
         ))
 
     return cards
