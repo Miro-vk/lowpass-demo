@@ -195,16 +195,39 @@ def get_daily_cards():
     clusters = cluster_posts(all_posts)
     ranked = sorted(clusters, key=score_cluster, reverse=True)[:10]
 
+    # Build title list for Claude to annotate in one call
+    titles = [_cluster_representative(c).get("title") or "" for c in ranked]
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    snippets = [""] * len(titles)
+    if api_key:
+        claude = anthropic.Anthropic(api_key=api_key)
+        prompt = (
+            "For each story title below, write exactly ONE sentence (max 20 words) that explains "
+            "why this story matters or what it's about. Be direct and informative, no fluff. "
+            "Return ONLY the sentences, one per line, in the same order.\n\n"
+            + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
+        )
+        try:
+            with claude.messages.stream(
+                model=CLAUDE_MODEL,
+                max_tokens=400,
+                messages=[{"role": "user", "content": prompt}],
+            ) as stream:
+                lines = stream.get_final_message().content[0].text.strip().splitlines()
+            # Strip leading "1. " numbering if Claude included it
+            for i, line in enumerate(lines[:len(titles)]):
+                snippets[i] = line.lstrip("0123456789. ").strip()
+        except Exception:
+            pass  # Fall back to empty snippets
+
     cards = []
     for i, cluster in enumerate(ranked):
         rep = _cluster_representative(cluster)
-        snippet = (rep.get("selftext") or "").strip()
-        if len(snippet) > 300:
-            snippet = snippet[:300].rsplit(" ", 1)[0] + "…"
         cards.append(CardItem(
             id=str(i),
             title=rep.get("title") or "",
-            snippet=snippet,
+            snippet=snippets[i],
         ))
 
     return cards
