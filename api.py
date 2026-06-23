@@ -36,6 +36,12 @@ app = FastAPI(title="Lowpass Digest API")
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
 
+# Auth endpoints need the bare project URL (no /rest/v1 path suffix).
+# Support both "https://x.supabase.co" and "https://x.supabase.co/rest/v1/".
+from urllib.parse import urlparse as _urlparse
+_parsed = _urlparse(SUPABASE_URL)
+SUPABASE_AUTH_URL = f"{_parsed.scheme}://{_parsed.netloc}"
+
 
 # ---------------------------------------------------------------------------
 # Auth
@@ -53,7 +59,7 @@ def _auth_headers() -> dict:
 @app.post("/auth/signup", status_code=201)
 def signup(body: AuthIn):
     r = requests.post(
-        f"{SUPABASE_URL}/auth/v1/signup",
+        f"{SUPABASE_AUTH_URL}/auth/v1/signup",
         json={"email": body.email, "password": body.password},
         headers=_auth_headers(),
         timeout=10,
@@ -68,7 +74,7 @@ def signup(body: AuthIn):
 @app.post("/auth/login")
 def login(body: AuthIn):
     r = requests.post(
-        f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+        f"{SUPABASE_AUTH_URL}/auth/v1/token?grant_type=password",
         json={"email": body.email, "password": body.password},
         headers=_auth_headers(),
         timeout=10,
@@ -89,7 +95,7 @@ def get_current_user(authorization: str = Header(...)) -> AuthedUser:
     """Validate the Bearer token and return a Supabase client scoped to that user."""
     token = authorization.removeprefix("Bearer ").strip()
     r = requests.get(
-        f"{SUPABASE_URL}/auth/v1/user",
+        f"{SUPABASE_AUTH_URL}/auth/v1/user",
         headers={**_auth_headers(), "Authorization": f"Bearer {token}"},
         timeout=10,
     )
