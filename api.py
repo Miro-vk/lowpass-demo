@@ -251,9 +251,8 @@ def get_daily_cards():
     return cards
 
 
-def _synthesize_speech(text: str, api_key: str) -> tuple[str | None, str | None]:
-    """Call Google Cloud TTS REST API. Returns (base64_audio, error_message)."""
-    text = text[:4900]
+def _synthesize_speech(text: str, api_key: str) -> str | None:
+    """Call Google Cloud TTS REST API. Returns base64-encoded MP3 or None on failure."""
     try:
         resp = requests.post(
             f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
@@ -261,20 +260,22 @@ def _synthesize_speech(text: str, api_key: str) -> tuple[str | None, str | None]
                 "input": {"text": text},
                 "voice": {
                     "languageCode": "en-US",
-                    "name": "en-US-Chirp3-HD-Fenrir",
+                    "name": "en-US-Neural2-D",
+                    "ssmlGender": "MALE",
                 },
                 "audioConfig": {
                     "audioEncoding": "MP3",
                     "speakingRate": 1.05,
+                    "pitch": 0.0,
                 },
             },
-            timeout=60,
+            timeout=30,
         )
-        if not resp.ok:
-            return None, f"HTTP {resp.status_code}: {resp.text[:300]}"
-        return resp.json().get("audioContent"), None
+        resp.raise_for_status()
+        return resp.json().get("audioContent")  # GCP returns base64 directly
     except Exception as e:
-        return None, str(e)[:300]
+        print(f"[tts] synthesis failed: {e}", file=sys.stderr)
+        return None
 
 
 @app.post("/cards/summarize")
@@ -326,11 +327,8 @@ def summarize_saved_cards(body: SummarizeCardsIn):
         script = stream.get_final_message().content[0].text.strip()
 
     audio_b64 = None
-    tts_error = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
     if gcp_key:
-        audio_b64, tts_error = _synthesize_speech(script, gcp_key)
-    else:
-        tts_error = "GOOGLE_TTS_API_KEY not set on server"
+        audio_b64 = _synthesize_speech(script, gcp_key)
 
-    return {"audio_b64": audio_b64, "tts_error": tts_error}
+    return {"audio_b64": audio_b64}
