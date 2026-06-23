@@ -12,6 +12,8 @@ Endpoints:
 """
 
 import os
+import sys
+import requests
 from dotenv import load_dotenv
 load_dotenv("local.env")
 
