@@ -389,8 +389,6 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: C.black,
   },
   logoText: { fontSize: 18, fontWeight: "900", color: C.black, letterSpacing: 5 },
 
@@ -420,7 +418,7 @@ const styles = StyleSheet.create({
   },
   retryLabel: { color: C.bg, fontWeight: "900", fontSize: 12, letterSpacing: 2 },
 
-  deck: { flex: 1, alignItems: "center", justifyContent: "center" },
+  deck: { flex: 1, alignItems: "center", justifyContent: "center", marginBottom: 24 },
 
   cardShadow: {
     width: W - 40,
