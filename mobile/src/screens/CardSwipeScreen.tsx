@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { api } from "../api";
+import LowpassIcon from "../components/LowpassIcon";
 
 const { width: W, height: H } = Dimensions.get("window");
 
@@ -270,6 +271,11 @@ export default function CardSwipeScreen() {
         <Text style={styles.headerSub}>{saved.length} saved</Text>
       </View>
 
+      <View style={styles.logoStrip}>
+        <LowpassIcon size={32} />
+        <Text style={styles.logoText}>LOWPASS</Text>
+      </View>
+
       <View style={styles.deck}>
         <Swiper
           ref={swiperRef}
@@ -376,6 +382,17 @@ export default function CardSwipeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
+
+  logoStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: C.black,
+  },
+  logoText: { fontSize: 18, fontWeight: "900", color: C.black, letterSpacing: 5 },
 
   header: {
     flexDirection: "row",
