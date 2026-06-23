@@ -253,6 +253,8 @@ def get_daily_cards():
 
 def _synthesize_speech(text: str, api_key: str) -> str | None:
     """Call Google Cloud TTS REST API. Returns base64-encoded MP3 or None on failure."""
+    # GCP TTS REST API limit is 5000 bytes; truncate to be safe
+    text = text[:4900]
     try:
         resp = requests.post(
             f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
@@ -260,17 +262,20 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
                 "input": {"text": text},
                 "voice": {
                     "languageCode": "en-US",
-                    "name": "en-US-Chirp3-HD-Fenrir",
+                    "name": "en-US-Neural2-D",
+                    "ssmlGender": "MALE",
                 },
                 "audioConfig": {
                     "audioEncoding": "MP3",
                     "speakingRate": 1.05,
+                    "pitch": 0.0,
                 },
             },
             timeout=30,
         )
+        print(f"[tts] status={resp.status_code} body={resp.text[:300]}", file=sys.stderr)
         resp.raise_for_status()
-        return resp.json().get("audioContent")  # GCP returns base64 directly
+        return resp.json().get("audioContent")
     except Exception as e:
         print(f"[tts] synthesis failed: {e}", file=sys.stderr)
         return None
