@@ -46,27 +46,37 @@ class AuthIn(BaseModel):
     password: str
 
 
+def _auth_headers() -> dict:
+    return {"apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json"}
+
+
 @app.post("/auth/signup", status_code=201)
 def signup(body: AuthIn):
-    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    try:
-        sb.auth.sign_up({"email": body.email, "password": body.password})
-        return {"message": "Account created. Check your email to confirm before logging in."}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    r = requests.post(
+        f"{SUPABASE_URL}/auth/v1/signup",
+        json={"email": body.email, "password": body.password},
+        headers=_auth_headers(),
+        timeout=10,
+    )
+    if not r.ok:
+        data = r.json()
+        msg = data.get("error_description") or data.get("msg") or data.get("error") or "Signup failed"
+        raise HTTPException(status_code=400, detail=msg)
+    return {"message": "Account created. Check your email to confirm before logging in."}
 
 
 @app.post("/auth/login")
 def login(body: AuthIn):
-    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    try:
-        res = sb.auth.sign_in_with_password({"email": body.email, "password": body.password})
-        return {
-            "access_token": res.session.access_token,
-            "token_type": "bearer",
-        }
-    except Exception:
+    r = requests.post(
+        f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
+        json={"email": body.email, "password": body.password},
+        headers=_auth_headers(),
+        timeout=10,
+    )
+    if not r.ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    data = r.json()
+    return {"access_token": data["access_token"], "token_type": "bearer"}
 
 
 class AuthedUser:
@@ -78,17 +88,19 @@ class AuthedUser:
 def get_current_user(authorization: str = Header(...)) -> AuthedUser:
     """Validate the Bearer token and return a Supabase client scoped to that user."""
     token = authorization.removeprefix("Bearer ").strip()
-    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
-    try:
-        res = sb.auth.get_user(token)
-        if not res or not res.user:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
-    except HTTPException:
-        raise
-    except Exception:
+    r = requests.get(
+        f"{SUPABASE_URL}/auth/v1/user",
+        headers={**_auth_headers(), "Authorization": f"Bearer {token}"},
+        timeout=10,
+    )
+    if not r.ok:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
+    user_id = r.json().get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    sb = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
     sb.postgrest.auth(token)
-    return AuthedUser(user_id=res.user.id, sb=sb)
+    return AuthedUser(user_id=user_id, sb=sb)
 
 
 # ---------------------------------------------------------------------------
