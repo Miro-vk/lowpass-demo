@@ -260,13 +260,13 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
                 "input": {"text": text},
                 "voice": {
                     "languageCode": "en-US",
-                    "name": "en-US-Wavenet-D",
+                    "name": "en-US-Neural2-D",
                     "ssmlGender": "MALE",
                 },
                 "audioConfig": {
                     "audioEncoding": "MP3",
                     "speakingRate": 1.05,
-                    "pitch": -1.0,
+                    "pitch": 0.0,
                 },
             },
             timeout=30,

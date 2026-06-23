@@ -33,10 +33,19 @@ export default function CardSwipeScreen() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [trackWidth, setTrackWidth] = useState(0);
+  const seekingRef = useRef(false);
 
   useEffect(() => {
     return () => { sound?.unloadAsync(); };
   }, [sound]);
+
+  function formatTime(ms: number) {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
 
   async function loadAudio(b64: string) {
     await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
@@ -45,9 +54,22 @@ export default function CardSwipeScreen() {
       { shouldPlay: false }
     );
     newSound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) setPlaying(false);
+      if (!status.isLoaded) return;
+      if (!seekingRef.current) {
+        setPosition(status.positionMillis ?? 0);
+        setDuration(status.durationMillis ?? 0);
+      }
+      if (status.didJustFinish) setPlaying(false);
     });
     setSound(newSound);
+  }
+
+  async function seekTo(locationX: number) {
+    if (!sound || duration === 0 || trackWidth === 0) return;
+    const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
+    const newPos = ratio * duration;
+    setPosition(newPos);
+    await sound.setPositionAsync(newPos);
   }
 
   async function togglePlayback() {
@@ -105,6 +127,8 @@ export default function CardSwipeScreen() {
     setGenerating(false);
     setSound(null);
     setPlaying(false);
+    setPosition(0);
+    setDuration(0);
     setLoading(true);
     setError(null);
     api.getDailyCards()
@@ -164,16 +188,55 @@ export default function CardSwipeScreen() {
           ) : (
             <>
               {sound ? (
-                <TouchableOpacity
-                  style={[styles.playBtn, audioBusy && styles.playBtnBusy]}
-                  onPress={togglePlayback}
-                  disabled={audioBusy}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.playBtnText}>
-                    {playing ? "⏸  PAUSE" : "▶  PLAY PODCAST"}
-                  </Text>
-                </TouchableOpacity>
+                <View style={styles.player}>
+                  {/* Progress bar */}
+                  <View
+                    style={styles.progressTrack}
+                    onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+                    onStartShouldSetResponder={() => true}
+                    onResponderGrant={(e) => {
+                      seekingRef.current = true;
+                      seekTo(e.nativeEvent.locationX);
+                    }}
+                    onResponderMove={(e) => seekTo(e.nativeEvent.locationX)}
+                    onResponderRelease={() => { seekingRef.current = false; }}
+                  >
+                    <View style={styles.progressFill}>
+                      <View
+                        style={[
+                          styles.progressFilled,
+                          { width: duration > 0 ? `${(position / duration) * 100}%` as any : 0 },
+                        ]}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.progressThumb,
+                        { left: trackWidth > 0 && duration > 0
+                            ? Math.min((position / duration) * trackWidth - 6, trackWidth - 12)
+                            : -6 },
+                      ]}
+                    />
+                  </View>
+
+                  {/* Time labels */}
+                  <View style={styles.progressTimes}>
+                    <Text style={styles.progressTime}>{formatTime(position)}</Text>
+                    <Text style={styles.progressTime}>{formatTime(duration)}</Text>
+                  </View>
+
+                  {/* Play / Pause */}
+                  <TouchableOpacity
+                    style={[styles.playBtn, audioBusy && styles.playBtnBusy]}
+                    onPress={togglePlayback}
+                    disabled={audioBusy}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.playBtnText}>
+                      {playing ? "⏸  PAUSE" : "▶  PLAY PODCAST"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <View style={styles.podcastError}>
                   <Text style={styles.podcastErrorText}>AUDIO UNAVAILABLE</Text>
@@ -442,4 +505,36 @@ const styles = StyleSheet.create({
   podcastError: { alignItems: "center" as const, paddingVertical: 32, marginBottom: 32 },
   podcastErrorText: { fontSize: 13, fontWeight: "900", color: C.black, letterSpacing: 2, marginBottom: 8 },
   podcastErrorSub: { fontSize: 13, color: C.muted },
+
+  player: { marginBottom: 32 },
+  progressTrack: {
+    height: 20,
+    justifyContent: "center" as const,
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: 4,
+    backgroundColor: "#ddd",
+    borderRadius: 2,
+    overflow: "hidden" as const,
+  },
+  progressFilled: {
+    height: 4,
+    backgroundColor: C.black,
+    borderRadius: 2,
+  },
+  progressThumb: {
+    position: "absolute" as const,
+    top: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: C.black,
+  },
+  progressTimes: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    marginBottom: 20,
+  },
+  progressTime: { fontSize: 11, color: C.muted },
 });
