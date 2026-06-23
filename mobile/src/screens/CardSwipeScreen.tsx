@@ -313,6 +313,8 @@ export default function CardSwipeScreen() {
           animateCardOpacity
           disableTopSwipe
           disableBottomSwipe
+          marginTop={10}
+          marginBottom={H * 0.38}
           overlayLabels={{
             left: {
               title: "SKIP",
@@ -418,11 +420,11 @@ const styles = StyleSheet.create({
   },
   retryLabel: { color: C.bg, fontWeight: "900", fontSize: 12, letterSpacing: 2 },
 
-  deck: { flex: 1, alignItems: "center", justifyContent: "flex-start", paddingTop: 10 },
+  deck: { flex: 1, alignItems: "center" },
 
   cardShadow: {
     width: W - 40,
-    height: H * 0.58,
+    height: H * 0.50,
     shadowColor: C.black,
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
