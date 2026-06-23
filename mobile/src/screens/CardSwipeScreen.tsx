@@ -5,6 +5,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
+import { Audio } from "expo-av";
+import { File, Paths } from "expo-file-system";
 import { api } from "../api";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -30,6 +32,49 @@ export default function CardSwipeScreen() {
   const [done, setDone] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   const [summarizing, setSummarizing] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [audioBusy, setAudioBusy] = useState(false);
+  const audioBlobUri = useRef<string | null>(null);
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+  }, []);
+
+  useEffect(() => {
+    return () => { sound?.unloadAsync(); };
+  }, [sound]);
+
+  async function loadAudio(b64: string) {
+    const file = new File(Paths.cache, "brief.mp3");
+    file.write(b64, { encoding: "base64" });
+    audioBlobUri.current = file.uri;
+    const { sound: newSound } = await Audio.Sound.createAsync(
+      { uri: file.uri },
+      { shouldPlay: false }
+    );
+    newSound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) setPlaying(false);
+    });
+    setSound(newSound);
+  }
+
+  async function togglePlayback() {
+    if (audioBusy || !audioBlobUri.current) return;
+    setAudioBusy(true);
+    try {
+      if (!sound) return;
+      if (playing) {
+        await sound.pauseAsync();
+        setPlaying(false);
+      } else {
+        await sound.playAsync();
+        setPlaying(true);
+      }
+    } finally {
+      setAudioBusy(false);
+    }
+  }
 
   useEffect(() => {
     api.getDailyCards()
@@ -54,6 +99,7 @@ export default function CardSwipeScreen() {
         savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet }))
       );
       setReport(res.report);
+      if (res.audio_b64) await loadAudio(res.audio_b64);
     } catch (e: any) {
       setReport("Could not generate summary: " + e.message);
     } finally {
@@ -133,6 +179,19 @@ export default function CardSwipeScreen() {
                   <Text style={styles.reportBody}>{report}</Text>
                 </View>
               </View>
+
+              {sound && (
+                <TouchableOpacity
+                  style={[styles.playBtn, audioBusy && styles.playBtnBusy]}
+                  onPress={togglePlayback}
+                  disabled={audioBusy}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.playBtnText}>
+                    {playing ? "⏸  PAUSE" : "▶  LISTEN TO BRIEF"}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               <Text style={styles.savedLabel}>STORIES IN THIS BRIEF</Text>
               {saved.map((card, i) => (
@@ -358,6 +417,16 @@ const styles = StyleSheet.create({
     borderColor: C.black,
     padding: 20,
   },
+  playBtn: {
+    backgroundColor: C.black,
+    borderWidth: 2,
+    borderColor: C.black,
+    paddingVertical: 16,
+    alignItems: "center" as const,
+    marginBottom: 32,
+  },
+  playBtnBusy: { opacity: 0.5 },
+  playBtnText: { color: C.bg, fontWeight: "900" as const, fontSize: 13, letterSpacing: 2 },
   reportBody: { fontSize: 15, color: C.black, lineHeight: 26 },
 
   savedLabel: {

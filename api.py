@@ -249,6 +249,33 @@ def get_daily_cards():
     return cards
 
 
+def _synthesize_speech(text: str, api_key: str) -> str | None:
+    """Call Google Cloud TTS REST API. Returns base64-encoded MP3 or None on failure."""
+    try:
+        resp = requests.post(
+            f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
+            json={
+                "input": {"text": text},
+                "voice": {
+                    "languageCode": "en-US",
+                    "name": "en-US-Wavenet-D",
+                    "ssmlGender": "MALE",
+                },
+                "audioConfig": {
+                    "audioEncoding": "MP3",
+                    "speakingRate": 1.05,
+                    "pitch": -1.0,
+                },
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        return resp.json().get("audioContent")  # GCP returns base64 directly
+    except Exception as e:
+        print(f"[tts] synthesis failed: {e}", file=sys.stderr)
+        return None
+
+
 @app.post("/cards/summarize")
 def summarize_saved_cards(body: SummarizeCardsIn):
     """Summarize swiped-right cards into a brief report. No auth required."""
@@ -281,4 +308,9 @@ def summarize_saved_cards(body: SummarizeCardsIn):
     ) as stream:
         report = stream.get_final_message().content[0].text.strip()
 
-    return {"report": report}
+    audio_b64 = None
+    gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
+    if gcp_key:
+        audio_b64 = _synthesize_speech(report, gcp_key)
+
+    return {"report": report, "audio_b64": audio_b64}
