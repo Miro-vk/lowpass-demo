@@ -30,6 +30,7 @@ export default function CardSwipeScreen() {
   const savedRef = useRef<NewsCard[]>([]);
   const [done, setDone] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -52,8 +53,13 @@ export default function CardSwipeScreen() {
       playsInSilentModeIOS: true,
       staysActiveInBackground: true,
     });
+    // Data URIs fail for large MP3s — write to cache file first
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const FS = require("expo-file-system/legacy");
+    const fileUri: string = FS.cacheDirectory + "podcast.mp3";
+    await FS.writeAsStringAsync(fileUri, b64, { encoding: "base64" });
     const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: `data:audio/mpeg;base64,${b64}` },
+      { uri: fileUri },
       { shouldPlay: false }
     );
     newSound.setOnPlaybackStatusUpdate((status) => {
@@ -114,10 +120,12 @@ export default function CardSwipeScreen() {
         savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet }))
       );
       if (res.audio_b64) {
-        loadAudio(res.audio_b64).catch(() => {});
+        loadAudio(res.audio_b64).catch((e: any) => setAudioError("Load failed: " + String(e)));
+      } else {
+        setAudioError("TTS error: " + (res.tts_error ?? "unknown"));
       }
-    } catch {
-      // podcast generation failed silently — no audio will appear
+    } catch (e: any) {
+      setAudioError("API call failed: " + e.message);
     } finally {
       setGenerating(false);
     }
@@ -243,7 +251,7 @@ export default function CardSwipeScreen() {
               ) : (
                 <View style={styles.podcastError}>
                   <Text style={styles.podcastErrorText}>AUDIO UNAVAILABLE</Text>
-                  <Text style={styles.podcastErrorSub}>Could not generate podcast audio.</Text>
+                  <Text style={styles.podcastErrorSub}>{audioError ?? "Could not generate podcast audio."}</Text>
                 </View>
               )}
 

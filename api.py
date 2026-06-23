@@ -251,9 +251,8 @@ def get_daily_cards():
     return cards
 
 
-def _synthesize_speech(text: str, api_key: str) -> str | None:
-    """Call Google Cloud TTS REST API. Returns base64-encoded MP3 or None on failure."""
-    # GCP TTS REST API limit is 5000 bytes; truncate to be safe
+def _synthesize_speech(text: str, api_key: str) -> tuple[str | None, str | None]:
+    """Call Google Cloud TTS REST API. Returns (base64_audio, error_message)."""
     text = text[:4900]
     try:
         resp = requests.post(
@@ -271,12 +270,11 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
             },
             timeout=30,
         )
-        print(f"[tts] status={resp.status_code} body={resp.text[:300]}", file=sys.stderr)
-        resp.raise_for_status()
-        return resp.json().get("audioContent")
+        if not resp.ok:
+            return None, f"HTTP {resp.status_code}: {resp.text[:300]}"
+        return resp.json().get("audioContent"), None
     except Exception as e:
-        print(f"[tts] synthesis failed: {e}", file=sys.stderr)
-        return None
+        return None, str(e)[:300]
 
 
 @app.post("/cards/summarize")
@@ -328,8 +326,11 @@ def summarize_saved_cards(body: SummarizeCardsIn):
         script = stream.get_final_message().content[0].text.strip()
 
     audio_b64 = None
+    tts_error = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
     if gcp_key:
-        audio_b64 = _synthesize_speech(script, gcp_key)
+        audio_b64, tts_error = _synthesize_speech(script, gcp_key)
+    else:
+        tts_error = "GOOGLE_TTS_API_KEY not set on server"
 
-    return {"audio_b64": audio_b64}
+    return {"audio_b64": audio_b64, "tts_error": tts_error}

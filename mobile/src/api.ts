@@ -71,7 +71,7 @@ export const api = {
   getDailyCards: (): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>
     request("/cards/daily"),
 
-  summarizeCards: (cards: { title: string; snippet: string }[]): Promise<{ audio_b64: string | null }> =>
+  summarizeCards: (cards: { title: string; snippet: string }[]): Promise<{ audio_b64: string | null; tts_error: string | null }> =>
     request("/cards/summarize", undefined, {
       method: "POST",
       body: JSON.stringify({ cards }),
