@@ -260,7 +260,7 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
                 "input": {"text": text},
                 "voice": {
                     "languageCode": "en-US",
-                    "name": "en-US-Neural2-D",
+                    "name": "en-US-Chirp3-HD-Schedar",
                     "ssmlGender": "MALE",
                 },
                 "audioConfig": {
