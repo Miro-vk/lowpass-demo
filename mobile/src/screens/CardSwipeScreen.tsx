@@ -344,6 +344,7 @@ const styles = StyleSheet.create({
 
   cardShadow: {
     width: W - 40,
+    height: H * 0.58,
     shadowColor: C.black,
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -351,11 +352,11 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   card: {
+    flex: 1,
     backgroundColor: C.white,
     borderWidth: 2,
     borderColor: C.black,
     overflow: "hidden",
-    minHeight: H * 0.5,
   },
   cardImage: {
     width: "100%",
@@ -363,6 +364,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e5e5e5",
   },
   cardContent: {
+    flex: 1,
     padding: 24,
   },
   tagWrap: {
