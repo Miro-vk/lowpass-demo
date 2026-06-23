@@ -29,8 +29,7 @@ export default function CardSwipeScreen() {
   const [saved, setSaved] = useState<NewsCard[]>([]);
   const savedRef = useRef<NewsCard[]>([]);
   const [done, setDone] = useState(false);
-  const [report, setReport] = useState<string | null>(null);
-  const [summarizing, setSummarizing] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -84,19 +83,18 @@ export default function CardSwipeScreen() {
   async function handleSwipedAll() {
     setDone(true);
     if (savedRef.current.length === 0) return;
-    setSummarizing(true);
+    setGenerating(true);
     try {
       const res = await api.summarizeCards(
         savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet }))
       );
-      setReport(res.report);
       if (res.audio_b64) {
         loadAudio(res.audio_b64).catch(() => {});
       }
-    } catch (e: any) {
-      setReport("Could not generate summary: " + e.message);
+    } catch {
+      // podcast generation failed silently — no audio will appear
     } finally {
-      setSummarizing(false);
+      setGenerating(false);
     }
   }
 
@@ -104,7 +102,9 @@ export default function CardSwipeScreen() {
     savedRef.current = [];
     setSaved([]);
     setDone(false);
-    setReport(null);
+    setGenerating(false);
+    setSound(null);
+    setPlaying(false);
     setLoading(true);
     setError(null);
     api.getDailyCards()
@@ -143,7 +143,7 @@ export default function CardSwipeScreen() {
     return (
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>TODAY'S BRIEF</Text>
+          <Text style={styles.headerTitle}>TODAY'S PODCAST</Text>
           <TouchableOpacity onPress={reset}>
             <Text style={styles.refreshLabel}>REFRESH</Text>
           </TouchableOpacity>
@@ -153,27 +153,17 @@ export default function CardSwipeScreen() {
           {saved.length === 0 ? (
             <View style={styles.center}>
               <Text style={styles.emptyTitle}>YOU SKIPPED EVERYTHING</Text>
-              <Text style={styles.emptySub}>Swipe right on stories to build a brief.</Text>
+              <Text style={styles.emptySub}>Swipe right on stories to build your podcast.</Text>
             </View>
-          ) : summarizing ? (
+          ) : generating ? (
             <View style={styles.center}>
               <ActivityIndicator size="large" color={C.black} />
-              <Text style={styles.loadingText}>WRITING YOUR BRIEF…</Text>
+              <Text style={styles.loadingText}>PRODUCING YOUR PODCAST…</Text>
+              <Text style={styles.loadingHint}>Writing script and generating audio</Text>
             </View>
           ) : (
             <>
-              <View style={styles.reportMeta}>
-                <Text style={styles.reportMetaText}>
-                  {saved.length} stor{saved.length === 1 ? "y" : "ies"} saved
-                </Text>
-              </View>
-              <View style={styles.reportShadow}>
-                <View style={styles.reportCard}>
-                  <Text style={styles.reportBody}>{report}</Text>
-                </View>
-              </View>
-
-              {sound && (
+              {sound ? (
                 <TouchableOpacity
                   style={[styles.playBtn, audioBusy && styles.playBtnBusy]}
                   onPress={togglePlayback}
@@ -181,12 +171,19 @@ export default function CardSwipeScreen() {
                   activeOpacity={0.8}
                 >
                   <Text style={styles.playBtnText}>
-                    {playing ? "⏸  PAUSE" : "▶  LISTEN TO BRIEF"}
+                    {playing ? "⏸  PAUSE" : "▶  PLAY PODCAST"}
                   </Text>
                 </TouchableOpacity>
+              ) : (
+                <View style={styles.podcastError}>
+                  <Text style={styles.podcastErrorText}>AUDIO UNAVAILABLE</Text>
+                  <Text style={styles.podcastErrorSub}>Could not generate podcast audio.</Text>
+                </View>
               )}
 
-              <Text style={styles.savedLabel}>STORIES IN THIS BRIEF</Text>
+              <Text style={styles.savedLabel}>
+                {saved.length} STOR{saved.length === 1 ? "Y" : "IES"} IN THIS EPISODE
+              </Text>
               {saved.map((card, i) => (
                 <View key={card.id} style={styles.savedItem}>
                   <Text style={styles.savedIndex}>{i + 1}</Text>
@@ -441,4 +438,8 @@ const styles = StyleSheet.create({
 
   emptyTitle: { fontSize: 14, fontWeight: "900", color: C.black, letterSpacing: 2, marginBottom: 8 },
   emptySub: { fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 20 },
+
+  podcastError: { alignItems: "center" as const, paddingVertical: 32, marginBottom: 32 },
+  podcastErrorText: { fontSize: 13, fontWeight: "900", color: C.black, letterSpacing: 2, marginBottom: 8 },
+  podcastErrorSub: { fontSize: 13, color: C.muted },
 });

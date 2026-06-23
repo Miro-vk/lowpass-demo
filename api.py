@@ -291,28 +291,44 @@ def summarize_saved_cards(body: SummarizeCardsIn):
     claude = anthropic.Anthropic(api_key=api_key)
 
     stories_text = "\n\n".join(
-        f"Story {i + 1}: {c.get('title', '')}\n{c.get('snippet', '') or '(no excerpt)'}"
+        f"{i + 1}. {c.get('title', '')}\n   {c.get('snippet', '') or '(no excerpt)'}"
         for i, c in enumerate(body.cards)
     )
 
     prompt = (
-        f"The user saved {len(body.cards)} stories today. Write a concise, engaging briefing "
-        f"(5–8 sentences) that ties these stories together — highlight patterns, tensions, or "
-        f"big-picture themes worth paying attention to. Write in a clear, intelligent tone like "
-        f"a trusted analyst. Flowing prose only, no bullet points.\n\n"
-        f"STORIES:\n{stories_text}\n\nBRIEFING:"
+        'You are a podcast writer for a daily news show called "Lowpass." '
+        "Write a 5-minute solo-host script (approximately 750 words) based on the stories below "
+        "that the listener saved today.\n\n"
+        "TONE AND STYLE:\n"
+        "- Conversational and intelligent — like a trusted friend who reads everything so you don't have to\n"
+        "- Present tense, active voice\n"
+        "- No bullet points, no headers in the script itself — flowing speech only\n"
+        "- Vary sentence length to sound natural when read aloud\n"
+        "- Avoid saying \"firstly,\" \"secondly,\" etc. — transition naturally between stories\n\n"
+        "STRUCTURE:\n"
+        "1. Brief cold open (1-2 sentences) that hooks with the biggest theme connecting these stories\n"
+        "2. Cover each story with 2-4 sentences: what happened, why it matters, what to watch for\n"
+        "3. Tie the stories together at the end — what pattern or tension runs through today's news\n"
+        "4. Close with a single memorable line the listener will carry with them\n\n"
+        "RULES:\n"
+        '- Never say "In today\'s episode" or "Welcome back" — start immediately with the hook\n'
+        "- Don't read out URLs or source names\n"
+        "- Speak directly to \"you\" (the listener) occasionally to keep it personal\n"
+        "- Write exactly as it should be spoken — no stage directions, no [PAUSE], no formatting\n\n"
+        f"STORIES:\n{stories_text}\n\n"
+        "Write the full script now, starting with the cold open."
     )
 
     with claude.messages.stream(
         model=CLAUDE_MODEL,
-        max_tokens=500,
+        max_tokens=1200,
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
-        report = stream.get_final_message().content[0].text.strip()
+        script = stream.get_final_message().content[0].text.strip()
 
     audio_b64 = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
     if gcp_key:
-        audio_b64 = _synthesize_speech(report, gcp_key)
+        audio_b64 = _synthesize_speech(script, gcp_key)
 
-    return {"report": report, "audio_b64": audio_b64}
+    return {"audio_b64": audio_b64}
