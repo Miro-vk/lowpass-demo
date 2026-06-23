@@ -90,7 +90,9 @@ export default function CardSwipeScreen() {
         savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet }))
       );
       setReport(res.report);
-      if (res.audio_b64) await loadAudio(res.audio_b64);
+      if (res.audio_b64) {
+        loadAudio(res.audio_b64).catch(() => {});
+      }
     } catch (e: any) {
       setReport("Could not generate summary: " + e.message);
     } finally {

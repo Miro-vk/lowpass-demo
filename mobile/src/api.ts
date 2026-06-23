@@ -2,9 +2,10 @@ const BASE_URL = "https://lowpass-demo.onrender.com";
 
 // Digest takes time (multiple LLM calls); other endpoints just need to survive cold start.
 const TIMEOUT_MS: Record<string, number> = {
-  "/digest": 180_000,     // 3 min
-  "/cards/daily": 120_000, // 2 min — cold start + fetch + LLM annotation
-  default: 60_000,         // 1 min
+  "/digest": 180_000,          // 3 min
+  "/cards/daily": 120_000,     // 2 min — cold start + fetch + LLM annotation
+  "/cards/summarize": 120_000, // 2 min — cold start + LLM + TTS
+  default: 60_000,             // 1 min
 };
 
 async function request(path: string, token?: string, options: RequestInit = {}) {
