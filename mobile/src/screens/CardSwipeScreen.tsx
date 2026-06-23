@@ -8,21 +8,17 @@ import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { api } from "../api";
 import LowpassIcon from "../components/LowpassIcon";
+import { useTheme, Colors } from "../context/ThemeContext";
 
 const { width: W, height: H } = Dimensions.get("window");
-
-const C = {
-  bg: "#F5F4EF",
-  white: "#FFFFFF",
-  black: "#0A0A0A",
-  muted: "#888",
-  yes: "#2E7D32",
-  no: "#B71C1C",
-};
+const YES = "#2E7D32";
+const NO = "#B71C1C";
 
 type NewsCard = { id: string; title: string; tag: string; snippet: string; image_url?: string | null };
 
 export default function CardSwipeScreen() {
+  const { isDark, C } = useTheme();
+  const S = makeStyles(C);
   const swiperRef = useRef<Swiper<NewsCard>>(null);
   const [cards, setCards] = useState<NewsCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,11 +139,11 @@ export default function CardSwipeScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.black} />
-          <Text style={styles.loadingText}>FETCHING TODAY'S STORIES…</Text>
-          <Text style={styles.loadingHint}>First load may take ~30s</Text>
+      <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
+        <View style={S.center}>
+          <ActivityIndicator size="large" color={C.text} />
+          <Text style={S.loadingText}>FETCHING TODAY'S STORIES…</Text>
+          <Text style={S.loadingHint}>First load may take ~30s</Text>
         </View>
       </SafeAreaView>
     );
@@ -155,12 +151,12 @@ export default function CardSwipeScreen() {
 
   if (error) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        <View style={styles.center}>
-          <Text style={styles.errorTitle}>COULDN'T LOAD STORIES</Text>
-          <Text style={styles.errorSub}>{error}</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={reset}>
-            <Text style={styles.retryLabel}>TRY AGAIN</Text>
+      <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
+        <View style={S.center}>
+          <Text style={S.errorTitle}>COULDN'T LOAD STORIES</Text>
+          <Text style={S.errorSub}>{error}</Text>
+          <TouchableOpacity style={S.retryBtn} onPress={reset}>
+            <Text style={S.retryLabel}>TRY AGAIN</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -169,33 +165,32 @@ export default function CardSwipeScreen() {
 
   if (done) {
     return (
-      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>TODAY'S PODCAST</Text>
+      <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
+        <View style={S.header}>
+          <Text style={S.headerTitle}>TODAY'S PODCAST</Text>
           <TouchableOpacity onPress={reset}>
-            <Text style={styles.refreshLabel}>REFRESH</Text>
+            <Text style={S.refreshLabel}>REFRESH</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.reportContainer}>
+        <ScrollView contentContainerStyle={S.reportContainer}>
           {saved.length === 0 ? (
-            <View style={styles.center}>
-              <Text style={styles.emptyTitle}>YOU SKIPPED EVERYTHING</Text>
-              <Text style={styles.emptySub}>Swipe right on stories to build your podcast.</Text>
+            <View style={S.center}>
+              <Text style={S.emptyTitle}>YOU SKIPPED EVERYTHING</Text>
+              <Text style={S.emptySub}>Swipe right on stories to build your podcast.</Text>
             </View>
           ) : generating ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color={C.black} />
-              <Text style={styles.loadingText}>PRODUCING YOUR PODCAST…</Text>
-              <Text style={styles.loadingHint}>Writing script and generating audio</Text>
+            <View style={S.center}>
+              <ActivityIndicator size="large" color={C.text} />
+              <Text style={S.loadingText}>PRODUCING YOUR PODCAST…</Text>
+              <Text style={S.loadingHint}>Writing script and generating audio</Text>
             </View>
           ) : (
             <>
               {sound ? (
-                <View style={styles.player}>
-                  {/* Progress bar */}
+                <View style={S.player}>
                   <View
-                    style={styles.progressTrack}
+                    style={S.progressTrack}
                     onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
                     onStartShouldSetResponder={() => true}
                     onResponderGrant={(e) => {
@@ -205,17 +200,17 @@ export default function CardSwipeScreen() {
                     onResponderMove={(e) => seekTo(e.nativeEvent.locationX)}
                     onResponderRelease={() => { seekingRef.current = false; }}
                   >
-                    <View style={styles.progressFill}>
+                    <View style={S.progressFill}>
                       <View
                         style={[
-                          styles.progressFilled,
+                          S.progressFilled,
                           { width: duration > 0 ? `${(position / duration) * 100}%` as any : 0 },
                         ]}
                       />
                     </View>
                     <View
                       style={[
-                        styles.progressThumb,
+                        S.progressThumb,
                         { left: trackWidth > 0 && duration > 0
                             ? Math.min((position / duration) * trackWidth - 6, trackWidth - 12)
                             : -6 },
@@ -223,38 +218,36 @@ export default function CardSwipeScreen() {
                     />
                   </View>
 
-                  {/* Time labels */}
-                  <View style={styles.progressTimes}>
-                    <Text style={styles.progressTime}>{formatTime(position)}</Text>
-                    <Text style={styles.progressTime}>{formatTime(duration)}</Text>
+                  <View style={S.progressTimes}>
+                    <Text style={S.progressTime}>{formatTime(position)}</Text>
+                    <Text style={S.progressTime}>{formatTime(duration)}</Text>
                   </View>
 
-                  {/* Play / Pause */}
                   <TouchableOpacity
-                    style={[styles.playBtn, audioBusy && styles.playBtnBusy]}
+                    style={[S.playBtn, audioBusy && S.playBtnBusy]}
                     onPress={togglePlayback}
                     disabled={audioBusy}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.playBtnText}>
+                    <Text style={S.playBtnText}>
                       {playing ? "⏸  PAUSE" : "▶  PLAY PODCAST"}
                     </Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View style={styles.podcastError}>
-                  <Text style={styles.podcastErrorText}>AUDIO UNAVAILABLE</Text>
-                  <Text style={styles.podcastErrorSub}>Could not generate podcast audio.</Text>
+                <View style={S.podcastError}>
+                  <Text style={S.podcastErrorText}>AUDIO UNAVAILABLE</Text>
+                  <Text style={S.podcastErrorSub}>Could not generate podcast audio.</Text>
                 </View>
               )}
 
-              <Text style={styles.savedLabel}>
+              <Text style={S.savedLabel}>
                 {saved.length} STOR{saved.length === 1 ? "Y" : "IES"} IN THIS EPISODE
               </Text>
               {saved.map((card, i) => (
-                <View key={card.id} style={styles.savedItem}>
-                  <Text style={styles.savedIndex}>{i + 1}</Text>
-                  <Text style={styles.savedTitle}>{card.title}</Text>
+                <View key={card.id} style={S.savedItem}>
+                  <Text style={S.savedIndex}>{i + 1}</Text>
+                  <Text style={S.savedTitle}>{card.title}</Text>
                 </View>
               ))}
             </>
@@ -265,38 +258,38 @@ export default function CardSwipeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>TODAY'S FEED</Text>
-        <Text style={styles.headerSub}>{saved.length} saved</Text>
+    <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
+      <View style={S.header}>
+        <Text style={S.headerTitle}>TODAY'S FEED</Text>
+        <Text style={S.headerSub}>{saved.length} saved</Text>
       </View>
 
-      <View style={styles.logoStrip}>
-        <LowpassIcon size={32} />
-        <Text style={styles.logoText}>LOWPASS</Text>
+      <View style={S.logoStrip}>
+        <LowpassIcon size={32} isDark={isDark} />
+        <Text style={S.logoText}>LOWPASS</Text>
       </View>
 
-      <View style={styles.deck}>
+      <View style={S.deck}>
         <Swiper
           ref={swiperRef}
           cards={cards}
           renderCard={(card) => (
-            <View style={styles.cardShadow}>
-              <View style={styles.card}>
+            <View style={S.cardShadow}>
+              <View style={S.card}>
                 {card.image_url ? (
                   <Image
                     source={{ uri: card.image_url }}
-                    style={styles.cardImage}
+                    style={S.cardImage}
                     resizeMode="cover"
                   />
                 ) : null}
-                <View style={styles.cardContent}>
-                  <View style={styles.tagWrap}>
-                    <Text style={styles.tag}>{card.tag}</Text>
+                <View style={S.cardContent}>
+                  <View style={S.tagWrap}>
+                    <Text style={S.tag}>{card.tag}</Text>
                   </View>
-                  <Text style={styles.cardTitle}>{card.title}</Text>
-                  <View style={styles.divider} />
-                  <Text style={styles.cardSnippet}>
+                  <Text style={S.cardTitle}>{card.title}</Text>
+                  <View style={S.divider} />
+                  <Text style={S.cardSnippet}>
                     {card.snippet || "Trending story from the past 24 hours."}
                   </Text>
                 </View>
@@ -320,8 +313,8 @@ export default function CardSwipeScreen() {
               title: "SKIP",
               style: {
                 label: {
-                  backgroundColor: C.no,
-                  color: C.white,
+                  backgroundColor: NO,
+                  color: "#FFFFFF",
                   borderWidth: 0,
                   fontSize: 16,
                   fontWeight: "900",
@@ -341,8 +334,8 @@ export default function CardSwipeScreen() {
               title: "SAVE",
               style: {
                 label: {
-                  backgroundColor: C.yes,
-                  color: C.white,
+                  backgroundColor: YES,
+                  color: "#FFFFFF",
                   borderWidth: 0,
                   fontSize: 16,
                   fontWeight: "900",
@@ -362,199 +355,201 @@ export default function CardSwipeScreen() {
         />
       </View>
 
-      <View style={styles.actions}>
+      <View style={S.actions}>
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionSkip]}
+          style={[S.actionBtn, S.actionSkip]}
           onPress={() => swiperRef.current?.swipeLeft()}
           activeOpacity={0.8}
         >
-          <Text style={[styles.actionLabel, { color: C.no }]}>✕  SKIP</Text>
+          <Text style={[S.actionLabel, { color: NO }]}>✕  SKIP</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionBtn, styles.actionSave]}
+          style={[S.actionBtn, S.actionSave]}
           onPress={() => swiperRef.current?.swipeRight()}
           activeOpacity={0.8}
         >
-          <Text style={[styles.actionLabel, { color: C.yes }]}>SAVE  ✓</Text>
+          <Text style={[S.actionLabel, { color: YES }]}>SAVE  ✓</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: C.bg },
+function makeStyles(C: Colors) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: C.bg },
 
-  logoStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  logoText: { fontSize: 18, fontWeight: "900", color: C.black, letterSpacing: 5 },
+    logoStrip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    logoText: { fontSize: 18, fontWeight: "900", color: C.text, letterSpacing: 5 },
 
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 2,
-    borderBottomColor: C.black,
-  },
-  headerTitle: { fontSize: 13, fontWeight: "900", color: C.black, letterSpacing: 2 },
-  headerSub: { fontSize: 12, color: C.muted },
-  refreshLabel: { fontSize: 11, fontWeight: "900", color: C.black, letterSpacing: 2 },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 10,
+      borderBottomWidth: 2,
+      borderBottomColor: C.border,
+    },
+    headerTitle: { fontSize: 13, fontWeight: "900", color: C.text, letterSpacing: 2 },
+    headerSub: { fontSize: 12, color: C.muted },
+    refreshLabel: { fontSize: 11, fontWeight: "900", color: C.text, letterSpacing: 2 },
 
-  center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
-  loadingText: { fontSize: 12, fontWeight: "900", color: C.black, letterSpacing: 2, marginTop: 20 },
-  loadingHint: { fontSize: 12, color: C.muted, marginTop: 8 },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+    loadingText: { fontSize: 12, fontWeight: "900", color: C.text, letterSpacing: 2, marginTop: 20 },
+    loadingHint: { fontSize: 12, color: C.muted, marginTop: 8 },
 
-  errorTitle: { fontSize: 14, fontWeight: "900", color: C.black, letterSpacing: 2, marginBottom: 10 },
-  errorSub: { fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 20, marginBottom: 24 },
-  retryBtn: {
-    backgroundColor: C.black, paddingHorizontal: 24, paddingVertical: 12,
-    borderWidth: 2, borderColor: C.black,
-  },
-  retryLabel: { color: C.bg, fontWeight: "900", fontSize: 12, letterSpacing: 2 },
+    errorTitle: { fontSize: 14, fontWeight: "900", color: C.text, letterSpacing: 2, marginBottom: 10 },
+    errorSub: { fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 20, marginBottom: 24 },
+    retryBtn: {
+      backgroundColor: C.text, paddingHorizontal: 24, paddingVertical: 12,
+      borderWidth: 2, borderColor: C.text,
+    },
+    retryLabel: { color: C.bg, fontWeight: "900", fontSize: 12, letterSpacing: 2 },
 
-  deck: { flex: 1, alignItems: "center" },
+    deck: { flex: 1, alignItems: "center" },
 
-  cardShadow: {
-    width: W - 40,
-    height: H * 0.50,
-    shadowColor: C.black,
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-  },
-  card: {
-    flex: 1,
-    backgroundColor: C.white,
-    borderWidth: 2,
-    borderColor: C.black,
-    overflow: "hidden",
-  },
-  cardImage: {
-    width: "100%",
-    height: H * 0.22,
-    backgroundColor: "#e5e5e5",
-  },
-  cardContent: {
-    flex: 1,
-    padding: 24,
-  },
-  tagWrap: {
-    alignSelf: "flex-start",
-    backgroundColor: C.black,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginBottom: 16,
-  },
-  tag: { fontSize: 10, fontWeight: "900", color: C.bg, letterSpacing: 2 },
-  cardTitle: {
-    fontSize: 21,
-    fontWeight: "900",
-    color: C.black,
-    lineHeight: 29,
-    marginBottom: 18,
-  },
-  divider: { height: 2, backgroundColor: C.black, marginBottom: 18 },
-  cardSnippet: { fontSize: 14, color: "#333", lineHeight: 23 },
+    cardShadow: {
+      width: W - 40,
+      height: H * 0.50,
+      shadowColor: C.text,
+      shadowOffset: { width: 4, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 4,
+    },
+    card: {
+      flex: 1,
+      backgroundColor: C.card,
+      borderWidth: 2,
+      borderColor: C.border,
+      overflow: "hidden",
+    },
+    cardImage: {
+      width: "100%",
+      height: H * 0.22,
+      backgroundColor: "#e5e5e5",
+    },
+    cardContent: {
+      flex: 1,
+      padding: 24,
+    },
+    tagWrap: {
+      alignSelf: "flex-start",
+      backgroundColor: C.text,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginBottom: 16,
+    },
+    tag: { fontSize: 10, fontWeight: "900", color: C.bg, letterSpacing: 2 },
+    cardTitle: {
+      fontSize: 21,
+      fontWeight: "900",
+      color: C.text,
+      lineHeight: 29,
+      marginBottom: 18,
+    },
+    divider: { height: 2, backgroundColor: C.border, marginBottom: 18 },
+    cardSnippet: { fontSize: 14, color: C.muted, lineHeight: 23 },
 
-  actions: {
-    flexDirection: "row",
-    borderTopWidth: 2,
-    borderTopColor: C.black,
-  },
-  actionBtn: { flex: 1, paddingVertical: 18, alignItems: "center" },
-  actionSkip: { borderRightWidth: 1, borderRightColor: C.black },
-  actionSave: { borderLeftWidth: 1, borderLeftColor: C.black },
-  actionLabel: { fontSize: 13, fontWeight: "900", letterSpacing: 2 },
+    actions: {
+      flexDirection: "row",
+      borderTopWidth: 2,
+      borderTopColor: C.border,
+    },
+    actionBtn: { flex: 1, paddingVertical: 18, alignItems: "center" },
+    actionSkip: { borderRightWidth: 1, borderRightColor: C.border },
+    actionSave: { borderLeftWidth: 1, borderLeftColor: C.border },
+    actionLabel: { fontSize: 13, fontWeight: "900", letterSpacing: 2 },
 
-  reportContainer: { padding: 20, paddingBottom: 48 },
-  reportMeta: { marginBottom: 14 },
-  reportMetaText: { fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 2 },
-  reportShadow: {
-    shadowColor: C.black,
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
-    marginBottom: 32,
-  },
-  reportCard: {
-    backgroundColor: C.white,
-    borderWidth: 2,
-    borderColor: C.black,
-    padding: 20,
-  },
-  playBtn: {
-    backgroundColor: C.black,
-    borderWidth: 2,
-    borderColor: C.black,
-    paddingVertical: 16,
-    alignItems: "center" as const,
-    marginBottom: 32,
-  },
-  playBtnBusy: { opacity: 0.5 },
-  playBtnText: { color: C.bg, fontWeight: "900" as const, fontSize: 13, letterSpacing: 2 },
-  reportBody: { fontSize: 15, color: C.black, lineHeight: 26 },
+    reportContainer: { padding: 20, paddingBottom: 48 },
+    reportMeta: { marginBottom: 14 },
+    reportMetaText: { fontSize: 11, fontWeight: "900", color: C.muted, letterSpacing: 2 },
+    reportShadow: {
+      shadowColor: C.text,
+      shadowOffset: { width: 4, height: 4 },
+      shadowOpacity: 1,
+      shadowRadius: 0,
+      elevation: 4,
+      marginBottom: 32,
+    },
+    reportCard: {
+      backgroundColor: C.card,
+      borderWidth: 2,
+      borderColor: C.border,
+      padding: 20,
+    },
+    playBtn: {
+      backgroundColor: C.text,
+      borderWidth: 2,
+      borderColor: C.border,
+      paddingVertical: 16,
+      alignItems: "center" as const,
+      marginBottom: 32,
+    },
+    playBtnBusy: { opacity: 0.5 },
+    playBtnText: { color: C.bg, fontWeight: "900" as const, fontSize: 13, letterSpacing: 2 },
+    reportBody: { fontSize: 15, color: C.text, lineHeight: 26 },
 
-  savedLabel: {
-    fontSize: 11, fontWeight: "900", color: C.black,
-    letterSpacing: 2, marginBottom: 12,
-  },
-  savedItem: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    gap: 12,
-  },
-  savedIndex: { fontSize: 11, fontWeight: "900", color: C.muted, width: 18 },
-  savedTitle: { flex: 1, fontSize: 13, fontWeight: "600", color: C.black, lineHeight: 20 },
+    savedLabel: {
+      fontSize: 11, fontWeight: "900", color: C.text,
+      letterSpacing: 2, marginBottom: 12,
+    },
+    savedItem: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: C.border,
+      gap: 12,
+    },
+    savedIndex: { fontSize: 11, fontWeight: "900", color: C.muted, width: 18 },
+    savedTitle: { flex: 1, fontSize: 13, fontWeight: "600", color: C.text, lineHeight: 20 },
 
-  emptyTitle: { fontSize: 14, fontWeight: "900", color: C.black, letterSpacing: 2, marginBottom: 8 },
-  emptySub: { fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 20 },
+    emptyTitle: { fontSize: 14, fontWeight: "900", color: C.text, letterSpacing: 2, marginBottom: 8 },
+    emptySub: { fontSize: 13, color: C.muted, textAlign: "center", lineHeight: 20 },
 
-  podcastError: { alignItems: "center" as const, paddingVertical: 32, marginBottom: 32 },
-  podcastErrorText: { fontSize: 13, fontWeight: "900", color: C.black, letterSpacing: 2, marginBottom: 8 },
-  podcastErrorSub: { fontSize: 13, color: C.muted },
+    podcastError: { alignItems: "center" as const, paddingVertical: 32, marginBottom: 32 },
+    podcastErrorText: { fontSize: 13, fontWeight: "900", color: C.text, letterSpacing: 2, marginBottom: 8 },
+    podcastErrorSub: { fontSize: 13, color: C.muted },
 
-  player: { marginBottom: 32 },
-  progressTrack: {
-    height: 20,
-    justifyContent: "center" as const,
-    marginBottom: 4,
-  },
-  progressFill: {
-    height: 4,
-    backgroundColor: "#ddd",
-    borderRadius: 2,
-    overflow: "hidden" as const,
-  },
-  progressFilled: {
-    height: 4,
-    backgroundColor: C.black,
-    borderRadius: 2,
-  },
-  progressThumb: {
-    position: "absolute" as const,
-    top: 4,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: C.black,
-  },
-  progressTimes: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    marginBottom: 20,
-  },
-  progressTime: { fontSize: 11, color: C.muted },
-});
+    player: { marginBottom: 32 },
+    progressTrack: {
+      height: 20,
+      justifyContent: "center" as const,
+      marginBottom: 4,
+    },
+    progressFill: {
+      height: 4,
+      backgroundColor: C.border,
+      borderRadius: 2,
+      overflow: "hidden" as const,
+    },
+    progressFilled: {
+      height: 4,
+      backgroundColor: C.text,
+      borderRadius: 2,
+    },
+    progressThumb: {
+      position: "absolute" as const,
+      top: 4,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: C.text,
+    },
+    progressTimes: {
+      flexDirection: "row" as const,
+      justifyContent: "space-between" as const,
+      marginBottom: 20,
+    },
+    progressTime: { fontSize: 11, color: C.muted },
+  });
+}

@@ -1,0 +1,25 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lowpass app icon">
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="220" fill="#1A1A1A"/>
+
+  <!-- Input dots (the "noise" being fed in) -->
+  <g fill="#FFFFFF" opacity="0.55">
+    <circle cx="246" cy="318" r="24"/>
+    <circle cx="386" cy="252" r="29"/>
+    <circle cx="544" cy="299" r="24"/>
+    <circle cx="702" cy="246" r="29"/>
+    <circle cx="842" cy="308" r="24"/>
+    <circle cx="322" cy="440" r="24"/>
+    <circle cx="480" cy="412" r="24"/>
+    <circle cx="640" cy="440" r="24"/>
+    <circle cx="780" cy="412" r="24"/>
+  </g>
+
+  <!-- Funnel (the filter) -->
+  <path d="M 196 516 L 504 824 L 504 910 L 580 910 L 580 824 L 888 516"
+        fill="none" stroke="#FFFFFF" stroke-width="44"
+        stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- Output dot (the single filtered signal) -->
+  <circle cx="540" cy="970" r="38" fill="#F5B82E"/>
+</svg>
