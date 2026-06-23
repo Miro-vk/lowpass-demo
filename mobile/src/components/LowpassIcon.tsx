@@ -1,7 +1,7 @@
 import Svg, { Circle, Path, G, Rect } from "react-native-svg";
 
 export default function LowpassIcon({ size = 52, isDark = false }: { size?: number; isDark?: boolean }) {
-  const bg = isDark ? "#1A1A1A" : "#F5F4EF";
+  const bg = isDark ? "#0A0A0A" : "#F5F4EF";
   const ink = isDark ? "#FFFFFF" : "#1A1A1A";
   const opacity = isDark ? 0.55 : 0.35;
 

@@ -167,14 +167,14 @@ function makeStyles(C: Colors) {
       padding: 16, fontSize: 16, color: C.text, fontWeight: "500",
     },
     runBtn: {
-      backgroundColor: C.text, borderWidth: 2, borderColor: C.text,
+      backgroundColor: C.bg, borderWidth: 2, borderColor: C.text,
       padding: 16, alignItems: "center",
       shadowColor: C.text, shadowOffset: { width: 4, height: 4 },
       shadowOpacity: 1, shadowRadius: 0, elevation: 4,
     },
     runBtnDisabled: { opacity: 0.6 },
     runBtnInner: { flexDirection: "row", alignItems: "center", gap: 10 },
-    runBtnText: { color: C.bg, fontWeight: "900", fontSize: 14, letterSpacing: 2 },
+    runBtnText: { color: C.text, fontWeight: "900", fontSize: 14, letterSpacing: 2 },
     loadingHint: { color: C.muted, fontSize: 12, textAlign: "center", marginTop: 8 },
 
     resultsSection: { marginBottom: 32 },
