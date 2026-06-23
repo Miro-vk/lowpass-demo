@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -48,7 +48,16 @@ function MainTabs() {
 }
 
 function Navigator() {
-  const { token } = useAuth();
+  const { token, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={styles.splash}>
+        <ActivityIndicator size="large" color={C.black} />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -76,6 +85,8 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  splash: { flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" },
+
   tabBar: {
     flexDirection: "row",
     backgroundColor: C.bg,

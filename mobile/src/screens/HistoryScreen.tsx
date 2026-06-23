@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useHistory } from "../context/HistoryContext";
+import { useAuth } from "../context/AuthContext";
 import type { DigestRun } from "../types";
 
 const C = {
@@ -70,16 +71,22 @@ function RunCard({ run }: { run: DigestRun }) {
 
 export default function HistoryScreen() {
   const { history, clearHistory } = useHistory();
+  const { logout } = useAuth();
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.header}>
         <Text style={styles.title}>HISTORY</Text>
-        {history.length > 0 && (
-          <TouchableOpacity onPress={clearHistory}>
-            <Text style={styles.clearBtn}>CLEAR</Text>
+        <View style={styles.headerActions}>
+          {history.length > 0 && (
+            <TouchableOpacity onPress={clearHistory}>
+              <Text style={styles.clearBtn}>CLEAR</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>LOG OUT</Text>
           </TouchableOpacity>
-        )}
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -108,7 +115,10 @@ const styles = StyleSheet.create({
     borderBottomColor: C.black,
   },
   title: { fontSize: 18, fontWeight: "900", color: C.black, letterSpacing: 3 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 16 },
   clearBtn: { fontSize: 11, fontWeight: "700", color: C.muted, letterSpacing: 1 },
+  logoutBtn: { borderWidth: 2, borderColor: C.black, paddingHorizontal: 10, paddingVertical: 4 },
+  logoutText: { fontSize: 11, fontWeight: "900", color: C.black, letterSpacing: 1 },
 
   content: { padding: 20, paddingBottom: 60 },
 
