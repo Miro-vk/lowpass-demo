@@ -48,7 +48,10 @@ export default function CardSwipeScreen() {
   }
 
   async function loadAudio(b64: string) {
-    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
+    await Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+    });
     const { sound: newSound } = await Audio.Sound.createAsync(
       { uri: `data:audio/mpeg;base64,${b64}` },
       { shouldPlay: false }
