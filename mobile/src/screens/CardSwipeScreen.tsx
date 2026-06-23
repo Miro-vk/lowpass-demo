@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   retryLabel: { color: C.bg, fontWeight: "900", fontSize: 12, letterSpacing: 2 },
 
-  deck: { flex: 1, alignItems: "center", justifyContent: "center", marginBottom: 24 },
+  deck: { flex: 1, alignItems: "center", justifyContent: "center", marginBottom: 80 },
 
   cardShadow: {
     width: W - 40,
