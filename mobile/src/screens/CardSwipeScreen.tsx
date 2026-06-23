@@ -6,7 +6,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
-import { File, Paths } from "expo-file-system";
 import { api } from "../api";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -35,22 +34,15 @@ export default function CardSwipeScreen() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
-  const audioBlobUri = useRef<string | null>(null);
-
-  useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-  }, []);
 
   useEffect(() => {
     return () => { sound?.unloadAsync(); };
   }, [sound]);
 
   async function loadAudio(b64: string) {
-    const file = new File(Paths.cache, "brief.mp3");
-    file.write(b64, { encoding: "base64" });
-    audioBlobUri.current = file.uri;
+    await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
     const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: file.uri },
+      { uri: `data:audio/mpeg;base64,${b64}` },
       { shouldPlay: false }
     );
     newSound.setOnPlaybackStatusUpdate((status) => {
@@ -60,10 +52,9 @@ export default function CardSwipeScreen() {
   }
 
   async function togglePlayback() {
-    if (audioBusy || !audioBlobUri.current) return;
+    if (audioBusy || !sound) return;
     setAudioBusy(true);
     try {
-      if (!sound) return;
       if (playing) {
         await sound.pauseAsync();
         setPlaying(false);
