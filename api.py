@@ -268,7 +268,7 @@ def _synthesize_speech(text: str, api_key: str) -> tuple[str | None, str | None]
                     "speakingRate": 1.05,
                 },
             },
-            timeout=30,
+            timeout=60,
         )
         if not resp.ok:
             return None, f"HTTP {resp.status_code}: {resp.text[:300]}"
