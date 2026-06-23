@@ -64,6 +64,15 @@ def fetch_reddit_trending(limit: int = 25):
     posts = []
     for child in resp.json().get("data", {}).get("children", []):
         d = child.get("data", {})
+        preview_images = d.get("preview", {}).get("images", [])
+        image_url = None
+        if preview_images:
+            src = preview_images[0].get("source", {}).get("url", "")
+            image_url = src.replace("&amp;", "&") if src else None
+        if not image_url:
+            thumb = d.get("thumbnail", "")
+            if thumb and thumb.startswith("http"):
+                image_url = thumb
         posts.append({
             "source": "reddit",
             "title": d.get("title"),
@@ -73,6 +82,7 @@ def fetch_reddit_trending(limit: int = 25):
             "url": f"https://reddit.com{d.get('permalink', '')}",
             "created_utc": d.get("created_utc"),
             "selftext": (d.get("selftext") or "")[:500],
+            "image_url": image_url,
         })
     return posts
 

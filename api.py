@@ -177,6 +177,7 @@ class CardItem(BaseModel):
     title: str
     tag: str
     snippet: str
+    image_url: str | None = None
 
 
 class SummarizeCardsIn(BaseModel):
@@ -242,6 +243,7 @@ def get_daily_cards():
             title=rep.get("title") or "",
             tag=annotations[i]["tag"],
             snippet=annotations[i]["snippet"],
+            image_url=rep.get("image_url"),
         ))
 
     return cards

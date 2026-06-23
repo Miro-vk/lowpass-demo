@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Dimensions, ActivityIndicator, ScrollView,
+  Dimensions, ActivityIndicator, ScrollView, Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
@@ -18,7 +18,7 @@ const C = {
   no: "#B71C1C",
 };
 
-type NewsCard = { id: string; title: string; tag: string; snippet: string };
+type NewsCard = { id: string; title: string; tag: string; snippet: string; image_url?: string | null };
 
 export default function CardSwipeScreen() {
   const swiperRef = useRef<Swiper<NewsCard>>(null);
@@ -162,14 +162,23 @@ export default function CardSwipeScreen() {
           renderCard={(card) => (
             <View style={styles.cardShadow}>
               <View style={styles.card}>
-                <View style={styles.tagWrap}>
-                  <Text style={styles.tag}>{card.tag}</Text>
+                {card.image_url ? (
+                  <Image
+                    source={{ uri: card.image_url }}
+                    style={styles.cardImage}
+                    resizeMode="cover"
+                  />
+                ) : null}
+                <View style={styles.cardContent}>
+                  <View style={styles.tagWrap}>
+                    <Text style={styles.tag}>{card.tag}</Text>
+                  </View>
+                  <Text style={styles.cardTitle}>{card.title}</Text>
+                  <View style={styles.divider} />
+                  <Text style={styles.cardSnippet}>
+                    {card.snippet || "Trending story from the past 24 hours."}
+                  </Text>
                 </View>
-                <Text style={styles.cardTitle}>{card.title}</Text>
-                <View style={styles.divider} />
-                <Text style={styles.cardSnippet}>
-                  {card.snippet || "Trending story from the past 24 hours."}
-                </Text>
               </View>
             </View>
           )}
@@ -293,8 +302,16 @@ const styles = StyleSheet.create({
     backgroundColor: C.white,
     borderWidth: 2,
     borderColor: C.black,
-    padding: 24,
+    overflow: "hidden",
     minHeight: H * 0.5,
+  },
+  cardImage: {
+    width: "100%",
+    height: H * 0.22,
+    backgroundColor: "#e5e5e5",
+  },
+  cardContent: {
+    padding: 24,
   },
   tagWrap: {
     alignSelf: "flex-start",

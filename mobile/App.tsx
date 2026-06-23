@@ -40,8 +40,8 @@ function TabBar({ state, navigation }: any) {
 function MainTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Chats" component={DigestScreen} />
       <Tab.Screen name="Cards" component={CardSwipeScreen} />
+      <Tab.Screen name="Search" component={DigestScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
     </Tab.Navigator>
   );
