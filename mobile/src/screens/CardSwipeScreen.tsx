@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
+import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api";
 import LengthPicker from "../components/LengthPicker";
 import LowpassIcon from "../components/LowpassIcon";
@@ -315,9 +316,16 @@ export default function CardSwipeScreen() {
                     disabled={audioBusy}
                     activeOpacity={0.8}
                   >
-                    <Text style={S.playBtnText}>
-                      {playing ? "⏸  PAUSE" : "▶  PLAY PODCAST"}
-                    </Text>
+                    <View style={S.playBtnInner}>
+                      <Ionicons
+                        name={playing ? "pause" : "play"}
+                        size={16}
+                        color={C.bg}
+                      />
+                      <Text style={S.playBtnText}>
+                        {playing ? "PAUSE" : "PLAY PODCAST"}
+                      </Text>
+                    </View>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -564,6 +572,7 @@ function makeStyles(C: Colors) {
       marginBottom: 32,
     },
     playBtnBusy: { opacity: 0.5 },
+    playBtnInner: { flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
     playBtnText: { color: C.bg, fontWeight: "900" as const, fontSize: 13, letterSpacing: 2 },
     reportBody: { fontSize: 15, color: C.text, lineHeight: 26 },
 
