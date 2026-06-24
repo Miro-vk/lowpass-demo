@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Lowpass app icon">
   <!-- Background -->
-  <rect width="1024" height="1024" rx="220" fill="#1A1A1A"/>
+  <rect width="1024" height="1024" rx="220" fill="#0A0A0A"/>
 
   <!-- Input dots (the "noise" being fed in) -->
   <g fill="#FFFFFF" opacity="0.55">

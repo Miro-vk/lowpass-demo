@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Dimensions, ActivityIndicator, ScrollView, Image,
@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import { api } from "../api";
+import LengthPicker from "../components/LengthPicker";
 import LowpassIcon from "../components/LowpassIcon";
 import { useTheme, Colors } from "../context/ThemeContext";
 
@@ -18,7 +19,7 @@ type NewsCard = { id: string; title: string; tag: string; snippet: string; image
 
 export default function CardSwipeScreen() {
   const { isDark, C } = useTheme();
-  const S = makeStyles(C);
+  const S = useMemo(() => makeStyles(C), [C]);
   const swiperRef = useRef<Swiper<NewsCard>>(null);
   const [cards, setCards] = useState<NewsCard[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,11 +28,14 @@ export default function CardSwipeScreen() {
   const savedRef = useRef<NewsCard[]>([]);
   const [done, setDone] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [lengthMinutes, setLengthMinutes] = useState(5);
+  const lengthMinutesRef = useRef(5);
+  // keep ref in sync so handleSwipedAll always reads the latest value
+  useEffect(() => { lengthMinutesRef.current = lengthMinutes; }, [lengthMinutes]);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [playback, setPlayback] = useState({ position: 0, duration: 0 });
   const [trackWidth, setTrackWidth] = useState(0);
   const seekingRef = useRef(false);
 
@@ -56,8 +60,10 @@ export default function CardSwipeScreen() {
     newSound.setOnPlaybackStatusUpdate((status) => {
       if (!status.isLoaded) return;
       if (!seekingRef.current) {
-        setPosition(status.positionMillis ?? 0);
-        setDuration(status.durationMillis ?? 0);
+        setPlayback({
+          position: status.positionMillis ?? 0,
+          duration: status.durationMillis ?? 0,
+        });
       }
       if (status.didJustFinish) setPlaying(false);
     });
@@ -65,10 +71,10 @@ export default function CardSwipeScreen() {
   }
 
   async function seekTo(locationX: number) {
-    if (!sound || duration === 0 || trackWidth === 0) return;
+    if (!sound || playback.duration === 0 || trackWidth === 0) return;
     const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
-    const newPos = ratio * duration;
-    setPosition(newPos);
+    const newPos = ratio * playback.duration;
+    setPlayback((p) => ({ ...p, position: newPos }));
     await sound.setPositionAsync(newPos);
   }
 
@@ -90,7 +96,7 @@ export default function CardSwipeScreen() {
 
   useEffect(() => {
     api.getDailyCards()
-      .then(setCards)
+      .then((data) => setCards(data.filter((c) => c.title.trim().length >= 10).slice(0, 10)))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
@@ -108,7 +114,8 @@ export default function CardSwipeScreen() {
     setGenerating(true);
     try {
       const res = await api.summarizeCards(
-        savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet }))
+        savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet })),
+        lengthMinutesRef.current,
       );
       if (res.audio_b64) {
         loadAudio(res.audio_b64).catch(() => {});
@@ -127,15 +134,34 @@ export default function CardSwipeScreen() {
     setGenerating(false);
     setSound(null);
     setPlaying(false);
-    setPosition(0);
-    setDuration(0);
+    setPlayback({ position: 0, duration: 0 });
     setLoading(true);
     setError(null);
     api.getDailyCards()
-      .then(setCards)
+      .then((data) => setCards(data.filter((c) => c.title.trim().length >= 10).slice(0, 10)))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }
+
+  const renderCard = useCallback((card: NewsCard) => (
+    <View style={S.cardShadow}>
+      <View style={S.card}>
+        {card.image_url ? (
+          <Image source={{ uri: card.image_url }} style={S.cardImage} resizeMode="cover" />
+        ) : null}
+        <View style={S.cardContent}>
+          <View style={S.tagWrap}>
+            <Text style={S.tag}>{card.tag}</Text>
+          </View>
+          <Text style={S.cardTitle}>{card.title}</Text>
+          <View style={S.divider} />
+          <Text style={S.cardSnippet}>
+            {card.snippet || "Trending story from the past 24 hours."}
+          </Text>
+        </View>
+      </View>
+    </View>
+  ), [S]);
 
   if (loading) {
     return (
@@ -168,9 +194,12 @@ export default function CardSwipeScreen() {
       <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
         <View style={S.header}>
           <Text style={S.headerTitle}>TODAY'S PODCAST</Text>
-          <TouchableOpacity onPress={reset}>
-            <Text style={S.refreshLabel}>REFRESH</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
+            <TouchableOpacity onPress={reset}>
+              <Text style={S.refreshLabel}>REFRESH</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={S.reportContainer}>
@@ -204,23 +233,23 @@ export default function CardSwipeScreen() {
                       <View
                         style={[
                           S.progressFilled,
-                          { width: duration > 0 ? `${(position / duration) * 100}%` as any : 0 },
+                          { width: playback.duration > 0 ? `${(playback.position / playback.duration) * 100}%` as any : 0 },
                         ]}
                       />
                     </View>
                     <View
                       style={[
                         S.progressThumb,
-                        { left: trackWidth > 0 && duration > 0
-                            ? Math.min((position / duration) * trackWidth - 6, trackWidth - 12)
+                        { left: trackWidth > 0 && playback.duration > 0
+                            ? Math.min((playback.position / playback.duration) * trackWidth - 6, trackWidth - 12)
                             : -6 },
                       ]}
                     />
                   </View>
 
                   <View style={S.progressTimes}>
-                    <Text style={S.progressTime}>{formatTime(position)}</Text>
-                    <Text style={S.progressTime}>{formatTime(duration)}</Text>
+                    <Text style={S.progressTime}>{formatTime(playback.position)}</Text>
+                    <Text style={S.progressTime}>{formatTime(playback.duration)}</Text>
                   </View>
 
                   <TouchableOpacity
@@ -264,38 +293,20 @@ export default function CardSwipeScreen() {
         <Text style={S.headerSub}>{saved.length} saved</Text>
       </View>
 
-      <View style={S.logoStrip}>
+      <View style={[S.logoStrip, { zIndex: 99, elevation: 99 }]}>
         <LowpassIcon size={32} isDark={isDark} />
         <Text style={S.logoText}>LOWPASS</Text>
+        <View style={{ flex: 1, alignItems: "flex-end" }}>
+          <Text style={S.pickerLabel}>SELECT PODCAST LENGTH</Text>
+          <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
+        </View>
       </View>
 
       <View style={S.deck}>
         <Swiper
           ref={swiperRef}
           cards={cards}
-          renderCard={(card) => (
-            <View style={S.cardShadow}>
-              <View style={S.card}>
-                {card.image_url ? (
-                  <Image
-                    source={{ uri: card.image_url }}
-                    style={S.cardImage}
-                    resizeMode="cover"
-                  />
-                ) : null}
-                <View style={S.cardContent}>
-                  <View style={S.tagWrap}>
-                    <Text style={S.tag}>{card.tag}</Text>
-                  </View>
-                  <Text style={S.cardTitle}>{card.title}</Text>
-                  <View style={S.divider} />
-                  <Text style={S.cardSnippet}>
-                    {card.snippet || "Trending story from the past 24 hours."}
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
+          renderCard={renderCard}
           onSwipedRight={handleSwipedRight}
           onSwipedAll={handleSwipedAll}
           cardIndex={0}
@@ -401,6 +412,7 @@ function makeStyles(C: Colors) {
     headerTitle: { fontSize: 13, fontWeight: "900", color: C.text, letterSpacing: 2 },
     headerSub: { fontSize: 12, color: C.muted },
     refreshLabel: { fontSize: 11, fontWeight: "900", color: C.text, letterSpacing: 2 },
+    pickerLabel: { fontSize: 8, fontWeight: "900", color: C.muted, letterSpacing: 1, marginBottom: 3 },
 
     center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
     loadingText: { fontSize: 12, fontWeight: "900", color: C.text, letterSpacing: 2, marginTop: 20 },

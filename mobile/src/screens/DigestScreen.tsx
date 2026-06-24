@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import { useHistory } from "../context/HistoryContext";
 import { useTheme, Colors } from "../context/ThemeContext";
 import LowpassIcon from "../components/LowpassIcon";
+import LengthPicker from "../components/LengthPicker";
 import type { DigestResult } from "../types";
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -19,6 +20,7 @@ export default function DigestScreen() {
   const { addRun, history } = useHistory();
   const { isDark, C } = useTheme();
   const [topic, setTopic] = useState("");
+  const [lengthMinutes, setLengthMinutes] = useState(5);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DigestResult[] | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -90,6 +92,10 @@ export default function DigestScreen() {
             {loading && (
               <Text style={S.loadingHint}>First run may take ~30s while the server wakes up.</Text>
             )}
+            <View style={{ alignSelf: "flex-end", marginTop: 8, alignItems: "flex-end" }}>
+              <Text style={S.pickerLabel}>SELECT PODCAST LENGTH</Text>
+              <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
+            </View>
           </View>
 
           {results && (
@@ -158,6 +164,7 @@ function makeStyles(C: Colors) {
     logoText: { fontSize: 32, fontWeight: "900", color: C.text, letterSpacing: 6 },
 
     inputSection: { marginBottom: 24 },
+    pickerLabel: { fontSize: 8, fontWeight: "900", color: C.muted, letterSpacing: 1, marginBottom: 3 },
     inputShadow: {
       shadowColor: C.text, shadowOffset: { width: 4, height: 4 },
       shadowOpacity: 1, shadowRadius: 0, elevation: 4, marginBottom: 10,

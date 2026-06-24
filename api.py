@@ -13,6 +13,7 @@ Endpoints:
 
 import os
 import sys
+import base64
 import requests
 from dotenv import load_dotenv
 load_dotenv("local.env")
@@ -203,9 +204,11 @@ class CardItem(BaseModel):
 
 class SummarizeCardsIn(BaseModel):
     cards: list[dict]
+    length_minutes: int = 5
 
 
 _VALID_TAGS = {"AI", "TECH", "SCIENCE", "BUSINESS", "POLICY", "WORLD", "HEALTH", "CULTURE", "SECURITY", "OTHER"}
+_BAD_SNIPPET_SIGNALS = ("unclear", "insufficient", "cannot determine", "no information", "not enough information")
 
 _cards_cache: list | None = None
 _cards_cache_ts: float = 0
@@ -222,15 +225,20 @@ def get_daily_cards():
     if _cards_cache is not None and (time.time() - _cards_cache_ts) < _CARDS_TTL:
         return _cards_cache
 
-    reddit_posts = fetch_reddit_trending(25)
-    hn_posts = fetch_hn_trending(25)
+    reddit_posts = fetch_reddit_trending(35)
+    hn_posts = fetch_hn_trending(35)
     all_posts = reddit_posts + hn_posts
 
     if not all_posts:
         raise HTTPException(status_code=503, detail="Could not fetch stories right now")
 
     clusters = cluster_posts(all_posts)
-    ranked = sorted(clusters, key=score_cluster, reverse=True)[:10]
+    all_ranked = sorted(clusters, key=score_cluster, reverse=True)
+    # Pre-filter clusters whose representative title is too short to be a real headline
+    ranked = [
+        c for c in all_ranked
+        if len((_cluster_representative(c).get("title") or "").strip()) >= 8
+    ][:20]
 
     titles = [_cluster_representative(c).get("title") or "" for c in ranked]
 
@@ -244,6 +252,7 @@ def get_daily_cards():
             "Each object must have:\n"
             '  "tag": one of AI, TECH, SCIENCE, BUSINESS, POLICY, WORLD, HEALTH, CULTURE, SECURITY, OTHER\n'
             '  "snippet": one sentence (max 25 words) explaining why this story matters\n\n'
+            "If a title is too vague or unclear to summarize meaningfully, set snippet to an empty string — do NOT write that the title is unclear.\n"
             "Return ONLY valid JSON, no markdown, no explanation.\n\n"
             "TITLES:\n"
             + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
@@ -251,7 +260,7 @@ def get_daily_cards():
         try:
             with claude.messages.stream(
                 model=CLAUDE_MODEL_FAST,
-                max_tokens=600,
+                max_tokens=1200,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
                 raw = stream.get_final_message().content[0].text.strip()
@@ -271,12 +280,18 @@ def get_daily_cards():
 
     cards = []
     for i, cluster in enumerate(ranked):
+        if len(cards) >= 20:
+            break
+        ann = annotations[i]
+        snippet = ann["snippet"]
+        if not snippet or any(sig in snippet.lower() for sig in _BAD_SNIPPET_SIGNALS):
+            continue
         rep = _cluster_representative(cluster)
         cards.append(CardItem(
-            id=str(i),
+            id=str(len(cards)),
             title=rep.get("title") or "",
-            tag=annotations[i]["tag"],
-            snippet=annotations[i]["snippet"],
+            tag=ann["tag"],
+            snippet=snippet,
             image_url=rep.get("image_url"),
         ))
 
@@ -285,42 +300,75 @@ def get_daily_cards():
     return cards
 
 
-def _synthesize_speech(text: str, api_key: str) -> str | None:
-    """Call Google Cloud TTS REST API. Returns base64-encoded MP3 or None on failure."""
+_LENGTH_CFG = {
+    2:  {"target_words": 280,  "max_tokens": 600},
+    5:  {"target_words": 700,  "max_tokens": 1400},
+    10: {"target_words": 1400, "max_tokens": 2600},
+}
+
+
+def _tts_chunk(text: str, api_key: str) -> str | None:
+    """Single TTS call for one chunk of text (must be under 4900 bytes)."""
     try:
         resp = requests.post(
             f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
             json={
                 "input": {"text": text},
-                "voice": {
-                    "languageCode": "en-US",
-                    "name": "en-US-Neural2-D",
-                    "ssmlGender": "MALE",
-                },
-                "audioConfig": {
-                    "audioEncoding": "MP3",
-                    "speakingRate": 1.05,
-                    "pitch": 0.0,
-                },
+                "voice": {"languageCode": "en-US", "name": "en-US-Neural2-D", "ssmlGender": "MALE"},
+                "audioConfig": {"audioEncoding": "MP3", "speakingRate": 1.05, "pitch": 0.0},
             },
-            timeout=30,
+            timeout=60,
         )
         resp.raise_for_status()
-        return resp.json().get("audioContent")  # GCP returns base64 directly
+        return resp.json().get("audioContent")
     except Exception as e:
-        print(f"[tts] synthesis failed: {e}", file=sys.stderr)
+        print(f"[tts] chunk failed: {e}", file=sys.stderr)
         return None
+
+
+def _synthesize_speech(text: str, api_key: str) -> str | None:
+    """Split text into <4900-byte chunks, synthesize each, return concatenated base64 MP3."""
+    max_bytes = 4800
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return _tts_chunk(text, api_key)
+
+    # Split at a sentence boundary near the midpoint
+    chunks: list[str] = []
+    remaining = text
+    while len(remaining.encode("utf-8")) > max_bytes:
+        mid = max_bytes // 2
+        split_at = mid
+        for i in range(mid, len(remaining)):
+            if remaining[i] in ".!?" and i + 1 < len(remaining) and remaining[i + 1] == " ":
+                split_at = i + 1
+                break
+        chunks.append(remaining[:split_at].strip())
+        remaining = remaining[split_at:].strip()
+    if remaining:
+        chunks.append(remaining)
+
+    audio_parts: list[bytes] = []
+    for chunk in chunks:
+        b64 = _tts_chunk(chunk, api_key)
+        if b64 is None:
+            return None
+        audio_parts.append(base64.b64decode(b64))
+
+    return base64.b64encode(b"".join(audio_parts)).decode()
 
 
 @app.post("/cards/summarize")
 def summarize_saved_cards(body: SummarizeCardsIn):
-    """Summarize swiped-right cards into a brief report. No auth required."""
+    """Generate a podcast script from swiped-right cards and synthesize audio."""
     if not body.cards:
         raise HTTPException(status_code=400, detail="No cards to summarize")
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured on server")
+
+    cfg = _LENGTH_CFG.get(body.length_minutes, _LENGTH_CFG[5])
 
     claude = anthropic.Anthropic(api_key=api_key)
 
@@ -329,10 +377,13 @@ def summarize_saved_cards(body: SummarizeCardsIn):
         for i, c in enumerate(body.cards)
     )
 
+    target = cfg["target_words"]
     prompt = (
         'You are a podcast writer for a daily news show called "Lowpass." '
-        "Write a 5-minute solo-host script (approximately 750 words) based on the stories below "
+        f'Write a solo-host script for a {body.length_minutes}-minute episode based on the stories below '
         "that the listener saved today.\n\n"
+        f"LENGTH: Your script must be {target} words — not shorter, not longer. "
+        f"This is a hard requirement. A {body.length_minutes}-minute episode at normal speaking pace is {target} words.\n\n"
         "TONE AND STYLE:\n"
         "- Conversational and intelligent — like a trusted friend who reads everything so you don't have to\n"
         "- Present tense, active voice\n"
@@ -348,14 +399,15 @@ def summarize_saved_cards(body: SummarizeCardsIn):
         '- Never say "In today\'s episode" or "Welcome back" — start immediately with the hook\n'
         "- Don't read out URLs or source names\n"
         "- Speak directly to \"you\" (the listener) occasionally to keep it personal\n"
-        "- Write exactly as it should be spoken — no stage directions, no [PAUSE], no formatting\n\n"
+        "- Write exactly as it should be spoken — no stage directions, no [PAUSE], no formatting\n"
+        f"- Write until you reach {target} words; do not stop early\n\n"
         f"STORIES:\n{stories_text}\n\n"
-        "Write the full script now, starting with the cold open."
+        f"Write the full {target}-word script now, starting with the cold open."
     )
 
     with claude.messages.stream(
         model=CLAUDE_MODEL,
-        max_tokens=800,
+        max_tokens=cfg["max_tokens"],
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         script = stream.get_final_message().content[0].text.strip()
