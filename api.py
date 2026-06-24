@@ -30,6 +30,7 @@ from digest import (
 )
 
 CLAUDE_MODEL = "claude-sonnet-4-6"
+CLAUDE_MODEL_FAST = "claude-haiku-4-5-20251001"
 
 app = FastAPI(title="Lowpass Digest API")
 
@@ -206,11 +207,20 @@ class SummarizeCardsIn(BaseModel):
 
 _VALID_TAGS = {"AI", "TECH", "SCIENCE", "BUSINESS", "POLICY", "WORLD", "HEALTH", "CULTURE", "SECURITY", "OTHER"}
 
+_cards_cache: list | None = None
+_cards_cache_ts: float = 0
+_CARDS_TTL = 3600  # 1 hour
+
 
 @app.get("/cards/daily", response_model=list[CardItem])
 def get_daily_cards():
     """Top 10 most-engaged stories from the past 24 hours. No auth required."""
     import json as _json
+    import time
+
+    global _cards_cache, _cards_cache_ts
+    if _cards_cache is not None and (time.time() - _cards_cache_ts) < _CARDS_TTL:
+        return _cards_cache
 
     reddit_posts = fetch_reddit_trending(25)
     hn_posts = fetch_hn_trending(25)
@@ -240,7 +250,7 @@ def get_daily_cards():
         )
         try:
             with claude.messages.stream(
-                model=CLAUDE_MODEL,
+                model=CLAUDE_MODEL_FAST,
                 max_tokens=600,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
@@ -266,6 +276,8 @@ def get_daily_cards():
             image_url=rep.get("image_url"),
         ))
 
+    _cards_cache = cards
+    _cards_cache_ts = time.time()
     return cards
 
 
@@ -339,7 +351,7 @@ def summarize_saved_cards(body: SummarizeCardsIn):
 
     with claude.messages.stream(
         model=CLAUDE_MODEL,
-        max_tokens=1200,
+        max_tokens=800,
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         script = stream.get_final_message().content[0].text.strip()
