@@ -86,10 +86,12 @@ export default function CardSwipeScreen() {
 
   // Holds fresh closures so the PanResponder (created once) always sees current values
   const seekHandlerRef = useRef({
-    drag: (_x: number) => {},
+    drag: (_pageX: number) => {},
     commit: async () => {},
   });
-  const startTouchXRef = useRef(0);
+  // Absolute screen X of the left edge of the progress track
+  const trackPageXRef = useRef(0);
+  const trackViewRef = useRef<View>(null);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -99,11 +101,14 @@ export default function CardSwipeScreen() {
       onMoveShouldSetPanResponderCapture: () => false,
       onPanResponderGrant: (e) => {
         seekingRef.current = true;
-        startTouchXRef.current = e.nativeEvent.locationX;
-        seekHandlerRef.current.drag(e.nativeEvent.locationX);
+        // Re-measure track position on every drag start to stay accurate after scroll
+        trackViewRef.current?.measure((_x, _y, _w, _h, px) => {
+          trackPageXRef.current = px;
+        });
+        seekHandlerRef.current.drag(e.nativeEvent.pageX);
       },
       onPanResponderMove: (_e, gs) => {
-        seekHandlerRef.current.drag(startTouchXRef.current + gs.dx);
+        seekHandlerRef.current.drag(gs.moveX);
       },
       onPanResponderRelease: () => seekHandlerRef.current.commit(),
       onPanResponderTerminate: () => { seekingRef.current = false; },
@@ -112,9 +117,10 @@ export default function CardSwipeScreen() {
 
   // Update handler with fresh values every render
   seekHandlerRef.current = {
-    drag: (x: number) => {
+    drag: (pageX: number) => {
       if (playback.duration === 0 || trackWidth === 0) return;
-      const newPos = Math.max(0, Math.min(1, x / trackWidth)) * playback.duration;
+      const localX = pageX - trackPageXRef.current;
+      const newPos = Math.max(0, Math.min(1, localX / trackWidth)) * playback.duration;
       seekPendingRef.current = newPos;
       setPlayback((p) => ({ ...p, position: newPos }));
     },
@@ -270,8 +276,14 @@ export default function CardSwipeScreen() {
               {sound ? (
                 <View style={S.player}>
                   <View
+                    ref={trackViewRef}
                     style={S.progressTrack}
-                    onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+                    onLayout={(e) => {
+                      setTrackWidth(e.nativeEvent.layout.width);
+                      trackViewRef.current?.measure((_x, _y, _w, _h, px) => {
+                        trackPageXRef.current = px;
+                      });
+                    }}
                     {...panResponder.panHandlers}
                   >
                     <View style={S.progressFill}>
