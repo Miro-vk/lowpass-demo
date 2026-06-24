@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Dimensions, ActivityIndicator, ScrollView, Image,
+  Dimensions, ActivityIndicator, ScrollView, Image, PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
@@ -38,6 +38,7 @@ export default function CardSwipeScreen() {
   const [playback, setPlayback] = useState({ position: 0, duration: 0 });
   const [trackWidth, setTrackWidth] = useState(0);
   const seekingRef = useRef(false);
+  const seekPendingRef = useRef(0);
 
   useEffect(() => {
     return () => { sound?.unloadAsync(); };
@@ -64,19 +65,69 @@ export default function CardSwipeScreen() {
           position: status.positionMillis ?? 0,
           duration: status.durationMillis ?? 0,
         });
+        setPlaying(status.isPlaying);
       }
-      if (status.didJustFinish) setPlaying(false);
+      if (status.didJustFinish) {
+        setPlaying(false);
+        // Reset to start so pressing play replays from the beginning
+        newSound.setPositionAsync(0).catch(() => {});
+      }
     });
+
+    // Seed duration immediately — the periodic callback may not fire for 500ms
+    newSound.getStatusAsync().then((status) => {
+      if (status.isLoaded && status.durationMillis) {
+        setPlayback({ position: 0, duration: status.durationMillis });
+      }
+    }).catch(() => {});
+
     setSound(newSound);
   }
 
-  async function seekTo(locationX: number) {
-    if (!sound || playback.duration === 0 || trackWidth === 0) return;
-    const ratio = Math.max(0, Math.min(1, locationX / trackWidth));
-    const newPos = ratio * playback.duration;
-    setPlayback((p) => ({ ...p, position: newPos }));
-    await sound.setPositionAsync(newPos);
-  }
+  // Holds fresh closures so the PanResponder (created once) always sees current values
+  const seekHandlerRef = useRef({
+    drag: (_x: number) => {},
+    commit: async () => {},
+  });
+  const startTouchXRef = useRef(0);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponderCapture: () => false,
+      onPanResponderGrant: (e) => {
+        seekingRef.current = true;
+        startTouchXRef.current = e.nativeEvent.locationX;
+        seekHandlerRef.current.drag(e.nativeEvent.locationX);
+      },
+      onPanResponderMove: (_e, gs) => {
+        seekHandlerRef.current.drag(startTouchXRef.current + gs.dx);
+      },
+      onPanResponderRelease: () => seekHandlerRef.current.commit(),
+      onPanResponderTerminate: () => { seekingRef.current = false; },
+    })
+  ).current;
+
+  // Update handler with fresh values every render
+  seekHandlerRef.current = {
+    drag: (x: number) => {
+      if (playback.duration === 0 || trackWidth === 0) return;
+      const newPos = Math.max(0, Math.min(1, x / trackWidth)) * playback.duration;
+      seekPendingRef.current = newPos;
+      setPlayback((p) => ({ ...p, position: newPos }));
+    },
+    commit: async () => {
+      try {
+        if (sound && playback.duration > 0) {
+          await sound.setPositionAsync(seekPendingRef.current);
+        }
+      } finally {
+        seekingRef.current = false;
+      }
+    },
+  };
 
   async function togglePlayback() {
     if (audioBusy || !sound) return;
@@ -221,13 +272,7 @@ export default function CardSwipeScreen() {
                   <View
                     style={S.progressTrack}
                     onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-                    onStartShouldSetResponder={() => true}
-                    onResponderGrant={(e) => {
-                      seekingRef.current = true;
-                      seekTo(e.nativeEvent.locationX);
-                    }}
-                    onResponderMove={(e) => seekTo(e.nativeEvent.locationX)}
-                    onResponderRelease={() => { seekingRef.current = false; }}
+                    {...panResponder.panHandlers}
                   >
                     <View style={S.progressFill}>
                       <View
@@ -241,8 +286,8 @@ export default function CardSwipeScreen() {
                       style={[
                         S.progressThumb,
                         { left: trackWidth > 0 && playback.duration > 0
-                            ? Math.min((playback.position / playback.duration) * trackWidth - 6, trackWidth - 12)
-                            : -6 },
+                            ? Math.min((playback.position / playback.duration) * trackWidth - 7, trackWidth - 14)
+                            : -7 },
                       ]}
                     />
                   </View>
@@ -534,7 +579,7 @@ function makeStyles(C: Colors) {
 
     player: { marginBottom: 32 },
     progressTrack: {
-      height: 20,
+      height: 44,
       justifyContent: "center" as const,
       marginBottom: 4,
     },
@@ -551,10 +596,10 @@ function makeStyles(C: Colors) {
     },
     progressThumb: {
       position: "absolute" as const,
-      top: 4,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
+      top: 16,
+      width: 14,
+      height: 14,
+      borderRadius: 7,
       backgroundColor: C.text,
     },
     progressTimes: {
