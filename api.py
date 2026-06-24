@@ -255,6 +255,10 @@ def get_daily_cards():
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
                 raw = stream.get_final_message().content[0].text.strip()
+            # Haiku often wraps JSON in ```json ... ``` — strip fences before parsing
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1]
+                raw = raw.rsplit("```", 1)[0].strip()
             parsed = _json.loads(raw)
             for i, obj in enumerate(parsed[:len(titles)]):
                 tag = (obj.get("tag") or "OTHER").upper()
