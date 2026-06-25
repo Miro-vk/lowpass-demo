@@ -24,8 +24,8 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 from digest import (
-    fetch_reddit, fetch_hn, fetch_youtube, fetch_x,
-    fetch_reddit_trending, fetch_hn_trending, fetch_nyt_trending,
+    fetch_hn, fetch_youtube, fetch_x,
+    fetch_hn_trending, fetch_nyt_trending,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
     normalize_source_scores,
@@ -186,7 +186,6 @@ def run_digest(body: DigestIn, user: AuthedUser = Depends(get_current_user)):
     claude = anthropic.Anthropic(api_key=api_key)
 
     all_posts = (
-        fetch_reddit(body.topic, 10, body.timeframe_days) +
         fetch_hn(body.topic, 10, body.timeframe_days) +
         fetch_youtube(body.topic, 10) +
         fetch_x(body.topic, 10)
@@ -254,14 +253,9 @@ def get_daily_cards():
     if _cards_cache is not None and (time.time() - _cards_cache_ts) < _CARDS_TTL:
         return _cards_cache
 
-    reddit_posts = fetch_reddit_trending(35)
     hn_posts = fetch_hn_trending(35)
     nyt_posts = fetch_nyt_trending(25)
-    # Normalize each source to the same ceiling before merging so NYT/HN
-    # can compete with Reddit's much larger raw vote counts.
-    # Stories covered by multiple sources accumulate scores naturally.
     all_posts = (
-        normalize_source_scores(reddit_posts) +
         normalize_source_scores(hn_posts) +
         normalize_source_scores(nyt_posts)
     )
@@ -417,7 +411,6 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
 
     import time as _time
     all_posts = (
-        fetch_reddit(body.topic, 15, body.timeframe_days) +
         fetch_hn(body.topic, 15, body.timeframe_days) +
         fetch_youtube(body.topic, 10, body.timeframe_days) +
         fetch_x(body.topic, 10, body.timeframe_days)
