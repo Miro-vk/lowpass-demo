@@ -166,6 +166,49 @@ def fetch_nyt_trending(limit: int = 25):
     return posts
 
 
+def fetch_nyt_section(section: str, limit: int = 15):
+    """Top stories from a specific NYT section (e.g. 'sports', 'technology')."""
+    api_key = os.environ.get("NYT_API_KEY")
+    if not api_key:
+        return []
+    try:
+        resp = requests.get(
+            f"https://api.nytimes.com/svc/topstories/v2/{section}.json",
+            params={"api-key": api_key},
+            timeout=10,
+        )
+        resp.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[nyt] section '{section}' fetch failed: {e}", file=sys.stderr)
+        return []
+
+    posts = []
+    for i, article in enumerate(resp.json().get("results", [])[:limit]):
+        published = article.get("published_date") or article.get("updated_date")
+        created_utc = None
+        if published:
+            try:
+                created_utc = datetime.fromisoformat(published).timestamp()
+            except (ValueError, TypeError):
+                pass
+        image_url = None
+        for media in (article.get("multimedia") or []):
+            if media.get("type") == "image":
+                image_url = media.get("url")
+                break
+        posts.append({
+            "source": "nyt",
+            "title": article.get("title") or "",
+            "score": max(50, 200 - i * 5),
+            "num_comments": 0,
+            "url": article.get("url") or "",
+            "created_utc": created_utc,
+            "selftext": (article.get("abstract") or "")[:500],
+            "image_url": image_url,
+        })
+    return posts
+
+
 def fetch_reddit(topic: str, limit: int = 10, timeframe_days: int = 30):
     t = "day" if timeframe_days <= 1 else "week" if timeframe_days <= 7 else "month"
     params = {"q": topic, "sort": "top", "t": t, "limit": limit}

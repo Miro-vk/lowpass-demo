@@ -12,10 +12,21 @@ import LoginScreen from "./src/screens/LoginScreen";
 import SignupScreen from "./src/screens/SignupScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
 import CardSwipeScreen from "./src/screens/CardSwipeScreen";
+import TopicSelectScreen from "./src/screens/TopicSelectScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
 
 const Stack = createNativeStackNavigator();
+const CardsStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
+
+function CardsNavigator() {
+  return (
+    <CardsStack.Navigator screenOptions={{ headerShown: false, animation: "slide_from_right" }}>
+      <CardsStack.Screen name="TopicSelect" component={TopicSelectScreen} />
+      <CardsStack.Screen name="CardSwipe" component={CardSwipeScreen} />
+    </CardsStack.Navigator>
+  );
+}
 
 function TabBar({ state, navigation }: any) {
   const { C } = useTheme();
@@ -42,7 +53,7 @@ function TabBar({ state, navigation }: any) {
 function MainTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="Cards" component={CardSwipeScreen} />
+      <Tab.Screen name="Cards" component={CardsNavigator} />
       <Tab.Screen name="History" component={HistoryScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>

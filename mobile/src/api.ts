@@ -87,8 +87,8 @@ export const api = {
       body: JSON.stringify({ topic, length_minutes: lengthMinutes, timeframe_days: timeframeDays, voice }),
     }),
 
-  getDailyCards: (): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>
-    request("/cards/daily"),
+  getDailyCards: (category: string = "WHATS_HOT"): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>
+    request(`/cards/daily?category=${encodeURIComponent(category)}`),
 
   summarizeCards: (
     cards: { title: string; snippet: string }[],

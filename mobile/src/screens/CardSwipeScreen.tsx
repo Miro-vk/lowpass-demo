@@ -19,7 +19,8 @@ const NO = "#B71C1C";
 
 type NewsCard = { id: string; title: string; tag: string; snippet: string; image_url?: string | null; source?: string };
 
-export default function CardSwipeScreen() {
+export default function CardSwipeScreen({ navigation, route }: any) {
+  const category: string = route?.params?.category ?? "WHATS_HOT";
   const { isDark, C } = useTheme();
   const { voiceName } = useVoice();
   const S = useMemo(() => makeStyles(C), [C]);
@@ -155,7 +156,7 @@ export default function CardSwipeScreen() {
   }
 
   useEffect(() => {
-    api.getDailyCards()
+    api.getDailyCards(category)
       .then((data) => setCards(data.filter((c) => c.title.trim().length >= 10).slice(0, 10)))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -189,19 +190,7 @@ export default function CardSwipeScreen() {
   }
 
   function reset() {
-    savedRef.current = [];
-    setSaved([]);
-    setDone(false);
-    setGenerating(false);
-    setSound(null);
-    setPlaying(false);
-    setPlayback({ position: 0, duration: 0 });
-    setLoading(true);
-    setError(null);
-    api.getDailyCards()
-      .then((data) => setCards(data.filter((c) => c.title.trim().length >= 10).slice(0, 10)))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    navigation.goBack();
   }
 
   const renderCard = useCallback((card: NewsCard) => (
@@ -257,11 +246,11 @@ export default function CardSwipeScreen() {
     return (
       <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
         <View style={S.header}>
-          <Text style={S.headerTitle}>TODAY'S PODCAST</Text>
+          <Text style={S.headerTitle}>{category === "WHATS_HOT" ? "WHAT'S HOT" : category} PODCAST</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
             <TouchableOpacity onPress={reset}>
-              <Text style={S.refreshLabel}>REFRESH</Text>
+              <Text style={S.refreshLabel}>NEW TOPIC</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -360,7 +349,7 @@ export default function CardSwipeScreen() {
   return (
     <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
       <View style={S.header}>
-        <Text style={S.headerTitle}>TODAY'S FEED</Text>
+        <Text style={S.headerTitle}>{category === "WHATS_HOT" ? "WHAT'S HOT" : category}</Text>
         <Text style={S.headerSub}>{saved.length} saved</Text>
       </View>
 

@@ -25,7 +25,7 @@ from supabase import create_client, Client
 
 from digest import (
     fetch_hn, fetch_youtube, fetch_x,
-    fetch_hn_trending, fetch_nyt_trending,
+    fetch_hn_trending, fetch_nyt_trending, fetch_nyt_section,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
     normalize_source_scores,
@@ -236,44 +236,37 @@ class SummarizeCardsIn(BaseModel):
     voice: str = "en-US-Chirp3-HD-Charon"
 
 
-_VALID_TAGS = {"AI", "TECH", "SCIENCE", "BUSINESS", "POLICY", "WORLD", "HEALTH", "CULTURE", "SECURITY", "OTHER"}
+_VALID_TAGS = {"TECH", "BUSINESS", "WORLD", "SCIENCE", "CULTURE", "SPORTS", "OTHER"}
 _BAD_SNIPPET_SIGNALS = ("unclear", "insufficient", "cannot determine", "no information", "not enough information")
 
-_cards_cache: list | None = None
-_cards_cache_ts: float = 0
+_cards_pool: list | None = None   # full annotated pool (~30 cards), shared across categories
+_cards_pool_ts: float = 0
 _CARDS_TTL = 3600  # 1 hour
 
 
-@app.get("/cards/daily", response_model=list[CardItem])
-def get_daily_cards():
-    """Top 10 most-engaged stories from the past 24 hours. No auth required."""
+def _build_cards_pool() -> list:
+    """Fetch, cluster, annotate and return up to 30 cards across all categories."""
     import json as _json
-    import time
 
-    global _cards_cache, _cards_cache_ts
-    if _cards_cache is not None and (time.time() - _cards_cache_ts) < _CARDS_TTL:
-        return _cards_cache
-
-    hn_posts = fetch_hn_trending(35)
-    nyt_posts = fetch_nyt_trending(25)
+    hn_posts = fetch_hn_trending(40)
+    nyt_home = fetch_nyt_trending(25)
+    nyt_sports = fetch_nyt_section("sports", 15)
     all_posts = (
         normalize_source_scores(hn_posts) +
-        normalize_source_scores(nyt_posts)
+        normalize_source_scores(nyt_home) +
+        normalize_source_scores(nyt_sports)
     )
-
     if not all_posts:
-        raise HTTPException(status_code=503, detail="Could not fetch stories right now")
+        return []
 
     clusters = cluster_posts(all_posts)
     all_ranked = sorted(clusters, key=score_cluster, reverse=True)
-    # Pre-filter clusters whose representative title is too short to be a real headline
     ranked = [
         c for c in all_ranked
         if len((_cluster_representative(c).get("title") or "").strip()) >= 8
-    ][:20]
+    ][:30]
 
     titles = [_cluster_representative(c).get("title") or "" for c in ranked]
-
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     annotations = [{"tag": "OTHER", "snippet": ""}] * len(titles)
 
@@ -282,9 +275,13 @@ def get_daily_cards():
         prompt = (
             "For each story title, return a JSON array (one object per story, same order).\n"
             "Each object must have:\n"
-            '  "tag": one of AI, TECH, SCIENCE, BUSINESS, POLICY, WORLD, HEALTH, CULTURE, SECURITY, OTHER\n'
+            '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, CULTURE, SPORTS, OTHER\n'
             '  "snippet": one sentence (max 25 words) explaining why this story matters\n\n'
-            "If a title is too vague or unclear to summarize meaningfully, set snippet to an empty string — do NOT write that the title is unclear.\n"
+            "Tag guidance: TECH covers AI, software, hardware, cybersecurity; "
+            "WORLD covers politics, foreign affairs, policy; "
+            "SCIENCE covers health, medicine, environment, research; "
+            "SPORTS covers any sport, athlete, or sporting event.\n"
+            "If a title is too vague to summarize, set snippet to empty string.\n"
             "Return ONLY valid JSON, no markdown, no explanation.\n\n"
             "TITLES:\n"
             + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
@@ -292,11 +289,10 @@ def get_daily_cards():
         try:
             with claude.messages.stream(
                 model=CLAUDE_MODEL_FAST,
-                max_tokens=1200,
+                max_tokens=1600,
                 messages=[{"role": "user", "content": prompt}],
             ) as stream:
                 raw = stream.get_final_message().content[0].text.strip()
-            # Haiku often wraps JSON in ```json ... ``` — strip fences before parsing
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[-1]
                 raw = raw.rsplit("```", 1)[0].strip()
@@ -308,20 +304,16 @@ def get_daily_cards():
                     "snippet": (obj.get("snippet") or "").strip(),
                 }
         except Exception:
-            pass  # Fall back to defaults
+            pass
 
     cards = []
     for i, cluster in enumerate(ranked):
-        if len(cards) >= 20:
-            break
         ann = annotations[i]
         snippet = ann["snippet"]
         if not snippet or any(sig in snippet.lower() for sig in _BAD_SNIPPET_SIGNALS):
             continue
         rep = _cluster_representative(cluster)
         has_nyt = any(p.get("source") == "nyt" for p in cluster)
-        # Don't use NYT-hosted images — they're licensed from wire services
-        # and the NYT API doesn't grant rights to reproduce them.
         safe_image = None if rep.get("source") == "nyt" else rep.get("image_url")
         cards.append(CardItem(
             id=str(len(cards)),
@@ -331,10 +323,29 @@ def get_daily_cards():
             image_url=safe_image,
             source="nyt" if has_nyt else "",
         ))
-
-    _cards_cache = cards
-    _cards_cache_ts = time.time()
     return cards
+
+
+@app.get("/cards/daily", response_model=list[CardItem])
+def get_daily_cards(category: str = "WHATS_HOT"):
+    """Cards filtered by category. category=WHATS_HOT returns the top 10 by engagement."""
+    import time
+
+    global _cards_pool, _cards_pool_ts
+    if _cards_pool is None or (time.time() - _cards_pool_ts) >= _CARDS_TTL:
+        pool = _build_cards_pool()
+        if not pool:
+            raise HTTPException(status_code=503, detail="Could not fetch stories right now")
+        _cards_pool = pool
+        _cards_pool_ts = time.time()
+
+    cat = category.upper()
+    if cat == "WHATS_HOT":
+        return _cards_pool[:10]
+    filtered = [c for c in _cards_pool if c.tag == cat]
+    if not filtered:
+        raise HTTPException(status_code=404, detail=f"No stories found for category '{cat}'")
+    return filtered[:10]
 
 
 _LENGTH_CFG = {
@@ -454,7 +465,7 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
         annotation_prompt = (
             "For each story title, return a JSON array (one object per story, same order).\n"
             "Each object must have:\n"
-            '  "tag": one of AI, TECH, SCIENCE, BUSINESS, POLICY, WORLD, HEALTH, CULTURE, SECURITY, OTHER\n'
+            '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, CULTURE, SPORTS, OTHER\n'
             f'  "snippet": one sentence (max 25 words) explaining why this story matters for the topic: {body.topic}\n\n'
             "If a title is too vague or unclear to summarize meaningfully, set snippet to an empty string.\n"
             "Return ONLY valid JSON, no markdown, no explanation.\n\n"
