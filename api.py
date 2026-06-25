@@ -350,7 +350,7 @@ def _tts_chunk(text: str, api_key: str) -> str | None:
             f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
             json={
                 "input": {"text": text},
-                "voice": {"languageCode": "en-US", "name": "en-US-Chirp-HD-F"},
+                "voice": {"languageCode": "en-US", "name": "en-US-Chirp-HD-Charon"},
                 "audioConfig": {"audioEncoding": "MP3"},
             },
             timeout=60,
