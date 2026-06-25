@@ -16,7 +16,7 @@ const { width: W, height: H } = Dimensions.get("window");
 const YES = "#2E7D32";
 const NO = "#B71C1C";
 
-type NewsCard = { id: string; title: string; tag: string; snippet: string; image_url?: string | null };
+type NewsCard = { id: string; title: string; tag: string; snippet: string; image_url?: string | null; source?: string };
 
 export default function CardSwipeScreen() {
   const { isDark, C } = useTheme();
@@ -216,6 +216,9 @@ export default function CardSwipeScreen() {
           <Text style={S.cardSnippet}>
             {card.snippet || "Trending story from the past 24 hours."}
           </Text>
+          {card.source === "nyt" && (
+            <Text style={S.nytAttribution}>Data provided by The New York Times</Text>
+          )}
         </View>
       </View>
     </View>
@@ -535,6 +538,7 @@ function makeStyles(C: Colors) {
     },
     divider: { height: 2, backgroundColor: C.border, marginBottom: 18 },
     cardSnippet: { fontSize: 14, color: C.muted, lineHeight: 23 },
+    nytAttribution: { fontSize: 9, color: C.muted, marginTop: 12, letterSpacing: 0.5 },
 
     actions: {
       flexDirection: "row",

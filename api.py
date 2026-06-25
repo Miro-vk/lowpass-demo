@@ -25,7 +25,7 @@ from supabase import create_client, Client
 
 from digest import (
     fetch_reddit, fetch_hn, fetch_youtube, fetch_x,
-    fetch_reddit_trending, fetch_hn_trending,
+    fetch_reddit_trending, fetch_hn_trending, fetch_nyt_trending,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
 )
@@ -200,6 +200,7 @@ class CardItem(BaseModel):
     tag: str
     snippet: str
     image_url: str | None = None
+    source: str = ""
 
 
 class SummarizeCardsIn(BaseModel):
@@ -227,7 +228,8 @@ def get_daily_cards():
 
     reddit_posts = fetch_reddit_trending(35)
     hn_posts = fetch_hn_trending(35)
-    all_posts = reddit_posts + hn_posts
+    nyt_posts = fetch_nyt_trending(25)
+    all_posts = reddit_posts + hn_posts + nyt_posts
 
     if not all_posts:
         raise HTTPException(status_code=503, detail="Could not fetch stories right now")
@@ -287,12 +289,14 @@ def get_daily_cards():
         if not snippet or any(sig in snippet.lower() for sig in _BAD_SNIPPET_SIGNALS):
             continue
         rep = _cluster_representative(cluster)
+        has_nyt = any(p.get("source") == "nyt" for p in cluster)
         cards.append(CardItem(
             id=str(len(cards)),
             title=rep.get("title") or "",
             tag=ann["tag"],
             snippet=snippet,
             image_url=rep.get("image_url"),
+            source="nyt" if has_nyt else "",
         ))
 
     _cards_cache = cards
