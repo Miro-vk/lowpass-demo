@@ -132,6 +132,7 @@ def mark_seen_db(sb: Client, user_id: str, clusters: list) -> None:
 class DigestIn(BaseModel):
     topic: str
     focus: str = ""
+    timeframe_days: int = 30
 
 
 class ClusterSummary(BaseModel):
@@ -158,8 +159,8 @@ def run_digest(body: DigestIn, user: AuthedUser = Depends(get_current_user)):
     claude = anthropic.Anthropic(api_key=api_key)
 
     all_posts = (
-        fetch_reddit(body.topic, 10) +
-        fetch_hn(body.topic, 10) +
+        fetch_reddit(body.topic, 10, body.timeframe_days) +
+        fetch_hn(body.topic, 10, body.timeframe_days) +
         fetch_youtube(body.topic, 10) +
         fetch_x(body.topic, 10)
     )

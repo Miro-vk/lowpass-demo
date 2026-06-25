@@ -62,10 +62,10 @@ export const api = {
   deleteTopic: (token: string, id: string) =>
     request(`/topics/${id}`, token, { method: "DELETE" }),
 
-  runDigest: (token: string, topic: string, focus: string = "") =>
+  runDigest: (token: string, topic: string, focus: string = "", timeframeDays: number = 30) =>
     request("/digest", token, {
       method: "POST",
-      body: JSON.stringify({ topic, focus }),
+      body: JSON.stringify({ topic, focus, timeframe_days: timeframeDays }),
     }),
 
   getDailyCards: (): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>

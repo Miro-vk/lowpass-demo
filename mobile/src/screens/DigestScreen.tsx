@@ -11,6 +11,7 @@ import { useHistory } from "../context/HistoryContext";
 import { useTheme, Colors } from "../context/ThemeContext";
 import LowpassIcon from "../components/LowpassIcon";
 import LengthPicker from "../components/LengthPicker";
+import TimeframePicker from "../components/TimeframePicker";
 import type { DigestResult } from "../types";
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -21,6 +22,7 @@ export default function DigestScreen() {
   const { isDark, C } = useTheme();
   const [topic, setTopic] = useState("");
   const [lengthMinutes, setLengthMinutes] = useState(5);
+  const [timeframeDays, setTimeframeDays] = useState(30);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<DigestResult[] | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -32,7 +34,7 @@ export default function DigestScreen() {
     setLoading(true);
     setResults(null);
     try {
-      const data: DigestResult[] = await api.runDigest(token!, t);
+      const data: DigestResult[] = await api.runDigest(token!, t, "", timeframeDays);
       setResults(data);
       addRun({ id: Date.now().toString(), topic: t, timestamp: new Date(), results: data });
       setTimeout(() => scrollRef.current?.scrollTo({ y: SCREEN_H * 0.4, animated: true }), 100);
@@ -92,9 +94,15 @@ export default function DigestScreen() {
             {loading && (
               <Text style={S.loadingHint}>First run may take ~30s while the server wakes up.</Text>
             )}
-            <View style={{ alignSelf: "flex-end", marginTop: 8, alignItems: "flex-end" }}>
-              <Text style={S.pickerLabel}>SELECT PODCAST LENGTH</Text>
-              <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 8 }}>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={S.pickerLabel}>SELECT TIMEFRAME</Text>
+                <TimeframePicker value={timeframeDays} onChange={setTimeframeDays} textColor={C.text} bgColor={C.bg} />
+              </View>
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={S.pickerLabel}>SELECT PODCAST LENGTH</Text>
+                <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
+              </View>
             </View>
           </View>
 

@@ -166,8 +166,9 @@ def fetch_nyt_trending(limit: int = 25):
     return posts
 
 
-def fetch_reddit(topic: str, limit: int = 10):
-    params = {"q": topic, "sort": "top", "t": "month", "limit": limit}
+def fetch_reddit(topic: str, limit: int = 10, timeframe_days: int = 30):
+    t = "day" if timeframe_days <= 1 else "week" if timeframe_days <= 7 else "month"
+    params = {"q": topic, "sort": "top", "t": t, "limit": limit}
     try:
         resp = requests.get(REDDIT_SEARCH_URL, headers=HEADERS, params=params, timeout=10)
         resp.raise_for_status()
@@ -191,8 +192,15 @@ def fetch_reddit(topic: str, limit: int = 10):
     return posts
 
 
-def fetch_hn(topic: str, limit: int = 10):
-    params = {"query": topic, "tags": "story", "hitsPerPage": limit}
+def fetch_hn(topic: str, limit: int = 10, timeframe_days: int = 30):
+    import time as _time
+    since = int(_time.time()) - timeframe_days * 86400
+    params = {
+        "query": topic,
+        "tags": "story",
+        "hitsPerPage": limit,
+        "numericFilters": f"created_at_i>{since}",
+    }
     try:
         resp = requests.get(HN_SEARCH_URL, params=params, timeout=10)
         resp.raise_for_status()
