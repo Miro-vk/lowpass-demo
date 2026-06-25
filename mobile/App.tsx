@@ -9,7 +9,6 @@ import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 
 import LoginScreen from "./src/screens/LoginScreen";
 import SignupScreen from "./src/screens/SignupScreen";
-import DigestScreen from "./src/screens/DigestScreen";
 import HistoryScreen from "./src/screens/HistoryScreen";
 import CardSwipeScreen from "./src/screens/CardSwipeScreen";
 import SettingsScreen from "./src/screens/SettingsScreen";
@@ -43,7 +42,6 @@ function MainTabs() {
   return (
     <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Cards" component={CardSwipeScreen} />
-      <Tab.Screen name="Search" component={DigestScreen} />
       <Tab.Screen name="History" component={HistoryScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
