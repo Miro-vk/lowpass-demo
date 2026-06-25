@@ -404,14 +404,18 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
     if not api_key:
         raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured on server")
 
+    import time as _time
     all_posts = (
         fetch_reddit(body.topic, 15, body.timeframe_days) +
         fetch_hn(body.topic, 15, body.timeframe_days) +
-        fetch_youtube(body.topic, 10) +
-        fetch_x(body.topic, 10)
+        fetch_youtube(body.topic, 10, body.timeframe_days) +
+        fetch_x(body.topic, 10, body.timeframe_days)
     )
+    # Hard cutoff: drop any post whose timestamp falls outside the selected timeframe
+    cutoff = _time.time() - body.timeframe_days * 86400
+    all_posts = [p for p in all_posts if p.get("created_utc") and p["created_utc"] >= cutoff]
     if not all_posts:
-        raise HTTPException(status_code=404, detail=f"No stories found for '{body.topic}'")
+        raise HTTPException(status_code=404, detail=f"No stories found for '{body.topic}' in the last {body.timeframe_days} day(s)")
 
     clusters = cluster_posts(all_posts)
     all_ranked = sorted(clusters, key=score_cluster, reverse=True)

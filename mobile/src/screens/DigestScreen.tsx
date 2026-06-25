@@ -25,7 +25,6 @@ export default function DigestScreen() {
   const [timeframeDays, setTimeframeDays] = useState(30);
   const [loading, setLoading] = useState(false);
   const [audioBuf, setAudioBuf] = useState<string | null>(null);
-  const [stories, setStories] = useState<{ title: string; snippet: string }[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   const S = makeStyles(C);
 
@@ -34,11 +33,9 @@ export default function DigestScreen() {
     if (!t) return Alert.alert("Enter a topic first");
     setLoading(true);
     setAudioBuf(null);
-    setStories([]);
     try {
       const data = await api.topicPodcast(token!, t, lengthMinutes, timeframeDays);
       setAudioBuf(data.audio_b64);
-      setStories(data.stories);
       addRun({ id: Date.now().toString(), topic: t, timestamp: new Date() });
       setTimeout(() => scrollRef.current?.scrollTo({ y: SCREEN_H * 0.5, animated: true }), 100);
     } catch (e: any) {
@@ -88,10 +85,10 @@ export default function DigestScreen() {
               {loading ? (
                 <View style={S.runBtnInner}>
                   <ActivityIndicator color={C.bg} size="small" />
-                  <Text style={S.runBtnText}>GENERATING PODCAST…</Text>
+                  <Text style={S.runBtnText}>FILTERING…</Text>
                 </View>
               ) : (
-                <Text style={S.runBtnText}>GENERATE PODCAST</Text>
+                <Text style={S.runBtnText}>FILTER THE NOISE</Text>
               )}
             </TouchableOpacity>
             {loading && (
@@ -113,22 +110,6 @@ export default function DigestScreen() {
             <View style={S.podcastSection}>
               <Text style={S.sectionLabel}>{topic.toUpperCase()} PODCAST</Text>
               <PodcastPlayer audioB64={audioBuf} />
-              {stories.length > 0 && (
-                <>
-                  <Text style={S.storiesLabel}>
-                    {stories.length} STOR{stories.length === 1 ? "Y" : "IES"} COVERED
-                  </Text>
-                  {stories.map((s, i) => (
-                    <View key={i} style={S.storyItem}>
-                      <Text style={S.storyIndex}>{i + 1}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={S.storyTitle}>{s.title}</Text>
-                        <Text style={S.storySnippet}>{s.snippet}</Text>
-                      </View>
-                    </View>
-                  ))}
-                </>
-              )}
             </View>
           )}
 
