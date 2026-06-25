@@ -227,14 +227,10 @@ def fetch_youtube(topic: str, limit: int = 10, timeframe_days: int = 30):
     if not api_key:
         return []
 
-    from datetime import datetime, timezone, timedelta
-    published_after = (datetime.now(timezone.utc) - timedelta(days=timeframe_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
     try:
         search_resp = requests.get(YOUTUBE_SEARCH_URL, params={
             "q": topic, "part": "snippet", "type": "video",
             "order": "relevance", "maxResults": limit, "key": api_key,
-            "publishedAfter": published_after,
         }, timeout=10)
         search_resp.raise_for_status()
     except requests.RequestException as e:
@@ -285,15 +281,11 @@ def fetch_x(topic: str, limit: int = 10, timeframe_days: int = 30):
     if not bearer_token:
         return []
 
-    from datetime import datetime, timezone, timedelta
-    start_time = (datetime.now(timezone.utc) - timedelta(days=timeframe_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
     try:
         resp = requests.get(X_SEARCH_URL, params={
             "query": f"{topic} -is:retweet lang:en",
             "max_results": max(10, min(limit, 100)),
             "tweet.fields": "public_metrics,created_at,text",
-            "start_time": start_time,
         }, headers={"Authorization": f"Bearer {bearer_token}"}, timeout=10)
         resp.raise_for_status()
     except requests.RequestException as e:
