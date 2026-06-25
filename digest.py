@@ -318,6 +318,25 @@ def fetch_x(topic: str, limit: int = 10, timeframe_days: int = 30):
 # Clustering (Step 2)
 # ---------------------------------------------------------------------------
 
+def normalize_source_scores(posts: list, target_max: float = 5000.0) -> list:
+    """Rescale posts so the top-engaged post in this source hits target_max.
+
+    This lets Reddit, HN, and NYT compete on equal footing before clustering.
+    Stories covered by multiple sources accumulate scores naturally.
+    """
+    if not posts:
+        return posts
+    max_eng = max((_post_engagement(p) for p in posts), default=1.0) or 1.0
+    factor = target_max / max_eng
+    result = []
+    for p in posts:
+        p2 = dict(p)
+        p2["score"] = int(_post_engagement(p2) * factor)
+        p2["num_comments"] = 0
+        result.append(p2)
+    return result
+
+
 def _normalize_url(url: str) -> str:
     return url.rstrip("/").lower()
 

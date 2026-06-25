@@ -28,6 +28,7 @@ from digest import (
     fetch_reddit_trending, fetch_hn_trending, fetch_nyt_trending,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
+    normalize_source_scores,
 )
 
 CLAUDE_MODEL = "claude-sonnet-4-6"
@@ -256,7 +257,14 @@ def get_daily_cards():
     reddit_posts = fetch_reddit_trending(35)
     hn_posts = fetch_hn_trending(35)
     nyt_posts = fetch_nyt_trending(25)
-    all_posts = reddit_posts + hn_posts + nyt_posts
+    # Normalize each source to the same ceiling before merging so NYT/HN
+    # can compete with Reddit's much larger raw vote counts.
+    # Stories covered by multiple sources accumulate scores naturally.
+    all_posts = (
+        normalize_source_scores(reddit_posts) +
+        normalize_source_scores(hn_posts) +
+        normalize_source_scores(nyt_posts)
+    )
 
     if not all_posts:
         raise HTTPException(status_code=503, detail="Could not fetch stories right now")
