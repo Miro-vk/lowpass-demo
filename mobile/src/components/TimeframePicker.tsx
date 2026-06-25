@@ -27,9 +27,14 @@ export default function TimeframePicker({ value, onChange, textColor, bgColor }:
         onPress={() => setOpen((o) => !o)}
         activeOpacity={0.8}
       >
-        <Text style={[styles.triggerText, { color: textColor }]}>
-          {label}  {open ? "▴" : "▾"}
-        </Text>
+        <View>
+          <Text style={[styles.triggerText, { color: "transparent" }]} numberOfLines={1}>
+            30 DAYS  ▾
+          </Text>
+          <Text style={[styles.triggerText, { color: textColor, position: "absolute", top: 0, left: 0, right: 0 }]} numberOfLines={1}>
+            {label}  {open ? "▴" : "▾"}
+          </Text>
+        </View>
       </TouchableOpacity>
 
       {open && (

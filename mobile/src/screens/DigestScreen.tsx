@@ -94,8 +94,8 @@ export default function DigestScreen() {
             {loading && (
               <Text style={S.loadingHint}>First run may take ~30s while the server wakes up.</Text>
             )}
-            <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 12, marginTop: 8 }}>
-              <View style={{ alignItems: "flex-end" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
+              <View style={{ alignItems: "flex-start" }}>
                 <Text style={S.pickerLabel}>SELECT TIMEFRAME</Text>
                 <TimeframePicker value={timeframeDays} onChange={setTimeframeDays} textColor={C.text} bgColor={C.bg} />
               </View>

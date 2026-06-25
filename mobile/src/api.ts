@@ -45,10 +45,16 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  login: (email: string, password: string): Promise<{ access_token: string }> =>
+  login: (email: string, password: string): Promise<{ access_token: string; refresh_token: string }> =>
     request("/auth/login", undefined, {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    }),
+
+  refreshToken: (refreshToken: string): Promise<{ access_token: string; refresh_token: string }> =>
+    request("/auth/refresh", undefined, {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken }),
     }),
 
   getTopics: (token: string) => request("/topics", token),

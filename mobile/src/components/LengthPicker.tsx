@@ -22,9 +22,14 @@ export default function LengthPicker({ value, onChange, textColor, bgColor }: Pr
         onPress={() => setOpen((o) => !o)}
         activeOpacity={0.8}
       >
-        <Text style={[styles.triggerText, { color: textColor }]}>
-          {value} MIN  {open ? "▴" : "▾"}
-        </Text>
+        <View>
+          <Text style={[styles.triggerText, { color: "transparent" }]} numberOfLines={1}>
+            10 MIN  ▾
+          </Text>
+          <Text style={[styles.triggerText, { color: textColor, position: "absolute", top: 0, left: 0, right: 0 }]} numberOfLines={1}>
+            {value} MIN  {open ? "▴" : "▾"}
+          </Text>
+        </View>
       </TouchableOpacity>
 
       {open && (

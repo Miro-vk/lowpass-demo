@@ -84,7 +84,33 @@ def login(body: AuthIn):
     if not r.ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     data = r.json()
-    return {"access_token": data["access_token"], "token_type": "bearer"}
+    return {
+        "access_token": data["access_token"],
+        "refresh_token": data.get("refresh_token", ""),
+        "token_type": "bearer",
+    }
+
+
+class RefreshIn(BaseModel):
+    refresh_token: str
+
+
+@app.post("/auth/refresh")
+def refresh(body: RefreshIn):
+    r = requests.post(
+        f"{SUPABASE_AUTH_URL}/auth/v1/token?grant_type=refresh_token",
+        json={"refresh_token": body.refresh_token},
+        headers=_auth_headers(),
+        timeout=10,
+    )
+    if not r.ok:
+        raise HTTPException(status_code=401, detail="Session expired, please log in again")
+    data = r.json()
+    return {
+        "access_token": data["access_token"],
+        "refresh_token": data.get("refresh_token", ""),
+        "token_type": "bearer",
+    }
 
 
 class AuthedUser:

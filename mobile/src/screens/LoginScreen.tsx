@@ -22,7 +22,7 @@ export default function LoginScreen({ navigation }: any) {
     setLoading(true);
     try {
       const res = await api.login(email, password);
-      setToken(res.access_token);
+      setToken(res.access_token, res.refresh_token);
     } catch (e: any) {
       Alert.alert("Login failed", e.message);
     } finally {
