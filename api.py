@@ -344,44 +344,65 @@ _LENGTH_CFG = {
 }
 
 
+def _run_streaming_tts(client, streaming_config, input_kwargs) -> bytes | None:
+    """Run one streaming synthesis attempt; returns raw PCM bytes or None."""
+    import re
+    from google.cloud import texttospeech
+
+    def request_generator():
+        yield texttospeech.StreamingSynthesizeRequest(streaming_config=streaming_config)
+        yield texttospeech.StreamingSynthesizeRequest(
+            input=texttospeech.StreamingSynthesisInput(**input_kwargs)
+        )
+
+    chunks = []
+    for response in client.streaming_synthesize(request_generator()):
+        chunks.append(response.audio_content)
+    return b"".join(chunks) if chunks else None
+
+
 def _synthesize_speech(ssml: str, api_key: str, voice: str = "en-US-Chirp3-HD-Charon") -> str | None:
-    """Synthesize SSML using Chirp3-HD streaming gRPC API. Returns base64 WAV."""
+    """Synthesize using Chirp3-HD streaming gRPC API. Returns base64 WAV."""
+    import io
+    import re
+    import wave
+
     try:
-        import io
-        import wave
         from google.api_core.client_options import ClientOptions
         from google.cloud import texttospeech
+    except ImportError as e:
+        print(f"[tts] google-cloud-texttospeech not available: {e}", file=sys.stderr)
+        return None
 
+    try:
         client = texttospeech.TextToSpeechClient(
             client_options=ClientOptions(api_key=api_key)
         )
-
         streaming_config = texttospeech.StreamingSynthesizeConfig(
-            voice=texttospeech.VoiceSelectionParams(
-                name=voice,
-                language_code="en-US",
-            )
+            voice=texttospeech.VoiceSelectionParams(name=voice, language_code="en-US")
         )
 
-        def request_generator():
-            yield texttospeech.StreamingSynthesizeRequest(streaming_config=streaming_config)
-            yield texttospeech.StreamingSynthesizeRequest(
-                input=texttospeech.StreamingSynthesisInput(ssml=ssml)
-            )
+        # Try SSML first; if the streaming API rejects it, fall back to plain text
+        pcm_data = None
+        for input_kwargs in [{"ssml": ssml}, {"text": re.sub(r"<[^>]+>", " ", ssml).strip()}]:
+            try:
+                pcm_data = _run_streaming_tts(client, streaming_config, input_kwargs)
+                if pcm_data:
+                    break
+            except Exception as inner:
+                print(f"[tts] attempt with {list(input_kwargs)[0]} failed: {inner}", file=sys.stderr)
 
-        audio_chunks = []
-        for response in client.streaming_synthesize(request_generator()):
-            audio_chunks.append(response.audio_content)
+        if not pcm_data:
+            return None
 
-        pcm_data = b"".join(audio_chunks)
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
             wf.setframerate(24000)
             wf.writeframes(pcm_data)
-
         return base64.b64encode(buf.getvalue()).decode()
+
     except Exception as e:
         print(f"[tts] streaming failed: {e}", file=sys.stderr)
         return None
