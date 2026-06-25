@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { AuthProvider, useAuth } from "./src/context/AuthContext";
 import { HistoryProvider } from "./src/context/HistoryContext";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { VoiceProvider } from "./src/context/VoiceContext";
 
 import LoginScreen from "./src/screens/LoginScreen";
 import SignupScreen from "./src/screens/SignupScreen";
@@ -79,11 +80,13 @@ function Navigator() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <HistoryProvider>
-          <Navigator />
-        </HistoryProvider>
-      </AuthProvider>
+      <VoiceProvider>
+        <AuthProvider>
+          <HistoryProvider>
+            <Navigator />
+          </HistoryProvider>
+        </AuthProvider>
+      </VoiceProvider>
     </ThemeProvider>
   );
 }

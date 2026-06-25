@@ -233,6 +233,7 @@ class CardItem(BaseModel):
 class SummarizeCardsIn(BaseModel):
     cards: list[dict]
     length_minutes: int = 5
+    voice: str = "en-US-Chirp3-HD-Charon"
 
 
 _VALID_TAGS = {"AI", "TECH", "SCIENCE", "BUSINESS", "POLICY", "WORLD", "HEALTH", "CULTURE", "SECURITY", "OTHER"}
@@ -343,8 +344,8 @@ _LENGTH_CFG = {
 }
 
 
-def _synthesize_speech(text: str, api_key: str) -> str | None:
-    """Synthesize speech using Chirp3-HD-Charon via the streaming gRPC API. Returns base64 WAV."""
+def _synthesize_speech(ssml: str, api_key: str, voice: str = "en-US-Chirp3-HD-Charon") -> str | None:
+    """Synthesize SSML using Chirp3-HD streaming gRPC API. Returns base64 WAV."""
     try:
         import io
         import wave
@@ -357,7 +358,7 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
 
         streaming_config = texttospeech.StreamingSynthesizeConfig(
             voice=texttospeech.VoiceSelectionParams(
-                name="en-US-Chirp3-HD-Charon",
+                name=voice,
                 language_code="en-US",
             )
         )
@@ -365,7 +366,7 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
         def request_generator():
             yield texttospeech.StreamingSynthesizeRequest(streaming_config=streaming_config)
             yield texttospeech.StreamingSynthesizeRequest(
-                input=texttospeech.StreamingSynthesisInput(text=text)
+                input=texttospeech.StreamingSynthesisInput(ssml=ssml)
             )
 
         audio_chunks = []
@@ -376,8 +377,8 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
         buf = io.BytesIO()
         with wave.open(buf, "wb") as wf:
             wf.setnchannels(1)
-            wf.setsampwidth(2)   # 16-bit PCM
-            wf.setframerate(24000)  # Chirp3-HD outputs 24kHz
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
             wf.writeframes(pcm_data)
 
         return base64.b64encode(buf.getvalue()).decode()
@@ -390,6 +391,7 @@ class TopicPodcastIn(BaseModel):
     topic: str
     length_minutes: int = 5
     timeframe_days: int = 30
+    voice: str = "en-US-Chirp3-HD-Charon"
 
 
 @app.post("/topic/podcast")
@@ -502,10 +504,15 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
         '- Never say "In today\'s episode" or "Welcome back" — start immediately with the hook\n'
         "- Don't read out URLs or source names\n"
         "- Speak directly to \"you\" (the listener) occasionally to keep it personal\n"
-        "- Write exactly as it should be spoken — no stage directions, no [PAUSE], no formatting\n"
         f"- Write until you reach {target} words; do not stop early\n\n"
+        "OUTPUT FORMAT: Valid SSML only — no plain text, no markdown.\n"
+        "- Wrap everything in <speak><prosody rate=\"94%\">...</prosody></speak>\n"
+        "- Use <break time=\"600ms\"/> between story transitions\n"
+        "- Use <break time=\"300ms\"/> between sentences\n"
+        "- Use <emphasis level=\"moderate\">word</emphasis> on 1-2 key terms per story\n"
+        "- Output ONLY the SSML. Nothing before <speak> or after </speak>.\n\n"
         f"STORIES:\n{stories_text}\n\n"
-        f"Write the full {target}-word script now, starting with the cold open."
+        f"Start with <speak><prosody rate=\"94%\"> then immediately the cold open. Write the full {target}-word script."
     )
 
     with claude.messages.stream(
@@ -518,7 +525,7 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
     audio_b64 = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
     if gcp_key:
-        audio_b64 = _synthesize_speech(script, gcp_key)
+        audio_b64 = _synthesize_speech(script, gcp_key, body.voice)
 
     return {"audio_b64": audio_b64, "stories": cards}
 
@@ -564,10 +571,15 @@ def summarize_saved_cards(body: SummarizeCardsIn):
         '- Never say "In today\'s episode" or "Welcome back" — start immediately with the hook\n'
         "- Don't read out URLs or source names\n"
         "- Speak directly to \"you\" (the listener) occasionally to keep it personal\n"
-        "- Write exactly as it should be spoken — no stage directions, no [PAUSE], no formatting\n"
         f"- Write until you reach {target} words; do not stop early\n\n"
+        "OUTPUT FORMAT: Valid SSML only — no plain text, no markdown.\n"
+        "- Wrap everything in <speak><prosody rate=\"94%\">...</prosody></speak>\n"
+        "- Use <break time=\"600ms\"/> between story transitions\n"
+        "- Use <break time=\"300ms\"/> between sentences\n"
+        "- Use <emphasis level=\"moderate\">word</emphasis> on 1-2 key terms per story\n"
+        "- Output ONLY the SSML. Nothing before <speak> or after </speak>.\n\n"
         f"STORIES:\n{stories_text}\n\n"
-        f"Write the full {target}-word script now, starting with the cold open."
+        f"Start with <speak><prosody rate=\"94%\"> then immediately the cold open. Write the full {target}-word script."
     )
 
     with claude.messages.stream(
@@ -580,6 +592,6 @@ def summarize_saved_cards(body: SummarizeCardsIn):
     audio_b64 = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
     if gcp_key:
-        audio_b64 = _synthesize_speech(script, gcp_key)
+        audio_b64 = _synthesize_speech(script, gcp_key, body.voice)
 
     return {"audio_b64": audio_b64}

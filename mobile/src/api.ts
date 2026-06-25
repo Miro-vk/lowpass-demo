@@ -80,10 +80,11 @@ export const api = {
     topic: string,
     lengthMinutes: number = 5,
     timeframeDays: number = 30,
+    voice: string = "en-US-Chirp3-HD-Charon",
   ): Promise<{ audio_b64: string | null; stories: { title: string; snippet: string }[] }> =>
     request("/topic/podcast", token, {
       method: "POST",
-      body: JSON.stringify({ topic, length_minutes: lengthMinutes, timeframe_days: timeframeDays }),
+      body: JSON.stringify({ topic, length_minutes: lengthMinutes, timeframe_days: timeframeDays, voice }),
     }),
 
   getDailyCards: (): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>
@@ -92,9 +93,10 @@ export const api = {
   summarizeCards: (
     cards: { title: string; snippet: string }[],
     lengthMinutes: number = 5,
+    voice: string = "en-US-Chirp3-HD-Charon",
   ): Promise<{ audio_b64: string | null }> =>
     request("/cards/summarize", undefined, {
       method: "POST",
-      body: JSON.stringify({ cards, length_minutes: lengthMinutes }),
+      body: JSON.stringify({ cards, length_minutes: lengthMinutes, voice }),
     }),
 };

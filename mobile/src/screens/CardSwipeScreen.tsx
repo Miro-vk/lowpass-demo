@@ -11,6 +11,7 @@ import { api } from "../api";
 import LengthPicker from "../components/LengthPicker";
 import LowpassIcon from "../components/LowpassIcon";
 import { useTheme, Colors } from "../context/ThemeContext";
+import { useVoice } from "../context/VoiceContext";
 
 const { width: W, height: H } = Dimensions.get("window");
 const YES = "#2E7D32";
@@ -20,6 +21,7 @@ type NewsCard = { id: string; title: string; tag: string; snippet: string; image
 
 export default function CardSwipeScreen() {
   const { isDark, C } = useTheme();
+  const { voiceName } = useVoice();
   const S = useMemo(() => makeStyles(C), [C]);
   const swiperRef = useRef<Swiper<NewsCard>>(null);
   const [cards, setCards] = useState<NewsCard[]>([]);
@@ -174,6 +176,7 @@ export default function CardSwipeScreen() {
       const res = await api.summarizeCards(
         savedRef.current.map((c) => ({ title: c.title, snippet: c.snippet })),
         lengthMinutesRef.current,
+        voiceName,
       );
       if (res.audio_b64) {
         loadAudio(res.audio_b64).catch(() => {});

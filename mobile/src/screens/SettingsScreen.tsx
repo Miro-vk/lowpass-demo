@@ -2,11 +2,13 @@ import { View, Text, TouchableOpacity, StyleSheet, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import { useVoice } from "../context/VoiceContext";
 import LowpassIcon from "../components/LowpassIcon";
 
 export default function SettingsScreen() {
   const { logout } = useAuth();
   const { isDark, toggleTheme, C } = useTheme();
+  const { gender, toggleVoice } = useVoice();
   const S = makeStyles(C);
 
   return (
@@ -33,6 +35,23 @@ export default function SettingsScreen() {
             <Switch
               value={isDark}
               onValueChange={toggleTheme}
+              trackColor={{ false: "#ccc", true: C.text }}
+              thumbColor={C.card}
+            />
+          </View>
+        </View>
+
+        <View style={S.section}>
+          <Text style={S.sectionLabel}>PODCAST VOICE</Text>
+
+          <View style={S.row}>
+            <View>
+              <Text style={S.rowLabel}>FEMALE VOICE</Text>
+              <Text style={S.rowSub}>{gender === "female" ? "Aoede (Female)" : "Charon (Male)"}</Text>
+            </View>
+            <Switch
+              value={gender === "female"}
+              onValueChange={toggleVoice}
               trackColor={{ false: "#ccc", true: C.text }}
               thumbColor={C.card}
             />
