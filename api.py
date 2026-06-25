@@ -325,12 +325,15 @@ def get_daily_cards():
             continue
         rep = _cluster_representative(cluster)
         has_nyt = any(p.get("source") == "nyt" for p in cluster)
+        # Don't use NYT-hosted images — they're licensed from wire services
+        # and the NYT API doesn't grant rights to reproduce them.
+        safe_image = None if rep.get("source") == "nyt" else rep.get("image_url")
         cards.append(CardItem(
             id=str(len(cards)),
             title=rep.get("title") or "",
             tag=ann["tag"],
             snippet=snippet,
-            image_url=rep.get("image_url"),
+            image_url=safe_image,
             source="nyt" if has_nyt else "",
         ))
 
