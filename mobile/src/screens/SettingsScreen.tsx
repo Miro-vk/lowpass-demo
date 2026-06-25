@@ -45,10 +45,7 @@ export default function SettingsScreen() {
           <Text style={S.sectionLabel}>PODCAST VOICE</Text>
 
           <View style={S.row}>
-            <View>
-              <Text style={S.rowLabel}>FEMALE VOICE</Text>
-              <Text style={S.rowSub}>{gender === "female" ? "Aoede (Female)" : "Charon (Male)"}</Text>
-            </View>
+            <Text style={S.rowLabel}>{gender === "female" ? "FEMALE VOICE" : "MALE VOICE"}</Text>
             <Switch
               value={gender === "female"}
               onValueChange={toggleVoice}
