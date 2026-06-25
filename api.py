@@ -343,55 +343,47 @@ _LENGTH_CFG = {
 }
 
 
-def _tts_chunk(text: str, api_key: str) -> str | None:
-    """Single TTS call for one chunk of text (must be under 4900 bytes)."""
-    try:
-        resp = requests.post(
-            f"https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}",
-            json={
-                "input": {"text": text},
-                "voice": {"languageCode": "en-US", "name": "en-US-Chirp-HD-Charon"},
-                "audioConfig": {"audioEncoding": "MP3"},
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        return resp.json().get("audioContent")
-    except Exception as e:
-        print(f"[tts] chunk failed: {e}", file=sys.stderr)
-        return None
-
-
 def _synthesize_speech(text: str, api_key: str) -> str | None:
-    """Split text into <4900-byte chunks, synthesize each, return concatenated base64 MP3."""
-    max_bytes = 4800
-    encoded = text.encode("utf-8")
-    if len(encoded) <= max_bytes:
-        return _tts_chunk(text, api_key)
+    """Synthesize speech using Chirp3-HD-Charon via the streaming gRPC API. Returns base64 WAV."""
+    try:
+        import io
+        import wave
+        from google.api_core.client_options import ClientOptions
+        from google.cloud import texttospeech
 
-    # Split at a sentence boundary near the midpoint
-    chunks: list[str] = []
-    remaining = text
-    while len(remaining.encode("utf-8")) > max_bytes:
-        mid = max_bytes // 2
-        split_at = mid
-        for i in range(mid, len(remaining)):
-            if remaining[i] in ".!?" and i + 1 < len(remaining) and remaining[i + 1] == " ":
-                split_at = i + 1
-                break
-        chunks.append(remaining[:split_at].strip())
-        remaining = remaining[split_at:].strip()
-    if remaining:
-        chunks.append(remaining)
+        client = texttospeech.TextToSpeechClient(
+            client_options=ClientOptions(api_key=api_key)
+        )
 
-    audio_parts: list[bytes] = []
-    for chunk in chunks:
-        b64 = _tts_chunk(chunk, api_key)
-        if b64 is None:
-            return None
-        audio_parts.append(base64.b64decode(b64))
+        streaming_config = texttospeech.StreamingSynthesizeConfig(
+            voice=texttospeech.VoiceSelectionParams(
+                name="en-US-Chirp3-HD-Charon",
+                language_code="en-US",
+            )
+        )
 
-    return base64.b64encode(b"".join(audio_parts)).decode()
+        def request_generator():
+            yield texttospeech.StreamingSynthesizeRequest(streaming_config=streaming_config)
+            yield texttospeech.StreamingSynthesizeRequest(
+                input=texttospeech.StreamingSynthesisInput(text=text)
+            )
+
+        audio_chunks = []
+        for response in client.streaming_synthesize(request_generator()):
+            audio_chunks.append(response.audio_content)
+
+        pcm_data = b"".join(audio_chunks)
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)   # 16-bit PCM
+            wf.setframerate(24000)  # Chirp3-HD outputs 24kHz
+            wf.writeframes(pcm_data)
+
+        return base64.b64encode(buf.getvalue()).decode()
+    except Exception as e:
+        print(f"[tts] streaming failed: {e}", file=sys.stderr)
+        return None
 
 
 class TopicPodcastIn(BaseModel):

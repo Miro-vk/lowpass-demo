@@ -56,7 +56,7 @@ export default function CardSwipeScreen() {
       staysActiveInBackground: true,
     });
     const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: `data:audio/mpeg;base64,${b64}` },
+      { uri: `data:audio/wav;base64,${b64}` },
       { shouldPlay: false }
     );
     newSound.setOnPlaybackStatusUpdate((status) => {

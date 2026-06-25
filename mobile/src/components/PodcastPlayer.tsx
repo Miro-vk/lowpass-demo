@@ -72,7 +72,7 @@ export default function PodcastPlayer({ audioB64 }: Props) {
     async function load() {
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: `data:audio/mpeg;base64,${audioB64}` },
+        { uri: `data:audio/wav;base64,${audioB64}` },
         { shouldPlay: false }
       );
       newSound.setOnPlaybackStatusUpdate((status) => {
