@@ -389,6 +389,140 @@ def _synthesize_speech(text: str, api_key: str) -> str | None:
     return base64.b64encode(b"".join(audio_parts)).decode()
 
 
+class TopicPodcastIn(BaseModel):
+    topic: str
+    length_minutes: int = 5
+    timeframe_days: int = 30
+
+
+@app.post("/topic/podcast")
+def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_user)):
+    """Fetch stories about a topic, generate a podcast script, and synthesize audio."""
+    import json as _json
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured on server")
+
+    all_posts = (
+        fetch_reddit(body.topic, 15, body.timeframe_days) +
+        fetch_hn(body.topic, 15, body.timeframe_days) +
+        fetch_youtube(body.topic, 10) +
+        fetch_x(body.topic, 10)
+    )
+    if not all_posts:
+        raise HTTPException(status_code=404, detail=f"No stories found for '{body.topic}'")
+
+    clusters = cluster_posts(all_posts)
+    all_ranked = sorted(clusters, key=score_cluster, reverse=True)
+    ranked = [
+        c for c in all_ranked
+        if len((_cluster_representative(c).get("title") or "").strip()) >= 8
+    ][:15]
+
+    if not ranked:
+        raise HTTPException(status_code=404, detail=f"No quality stories found for '{body.topic}'")
+
+    titles = [_cluster_representative(c).get("title") or "" for c in ranked]
+    claude = anthropic.Anthropic(api_key=api_key)
+    annotations = [{"tag": "OTHER", "snippet": ""}] * len(titles)
+
+    try:
+        annotation_prompt = (
+            "For each story title, return a JSON array (one object per story, same order).\n"
+            "Each object must have:\n"
+            '  "tag": one of AI, TECH, SCIENCE, BUSINESS, POLICY, WORLD, HEALTH, CULTURE, SECURITY, OTHER\n'
+            f'  "snippet": one sentence (max 25 words) explaining why this story matters for the topic: {body.topic}\n\n'
+            "If a title is too vague or unclear to summarize meaningfully, set snippet to an empty string.\n"
+            "Return ONLY valid JSON, no markdown, no explanation.\n\n"
+            "TITLES:\n"
+            + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
+        )
+        with claude.messages.stream(
+            model=CLAUDE_MODEL_FAST,
+            max_tokens=1200,
+            messages=[{"role": "user", "content": annotation_prompt}],
+        ) as stream:
+            raw = stream.get_final_message().content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1]
+            raw = raw.rsplit("```", 1)[0].strip()
+        parsed = _json.loads(raw)
+        for i, obj in enumerate(parsed[:len(titles)]):
+            tag = (obj.get("tag") or "OTHER").upper()
+            annotations[i] = {
+                "tag": tag if tag in _VALID_TAGS else "OTHER",
+                "snippet": (obj.get("snippet") or "").strip(),
+            }
+    except Exception:
+        pass
+
+    cards = []
+    for i, cluster in enumerate(ranked):
+        if len(cards) >= 10:
+            break
+        ann = annotations[i]
+        snippet = ann["snippet"]
+        if not snippet or any(sig in snippet.lower() for sig in _BAD_SNIPPET_SIGNALS):
+            continue
+        rep = _cluster_representative(cluster)
+        title = (rep.get("title") or "").strip()
+        if len(title) < 10:
+            continue
+        cards.append({"title": title, "snippet": snippet})
+
+    if not cards:
+        raise HTTPException(status_code=404, detail=f"Couldn't find enough quality stories about '{body.topic}'")
+
+    cfg = _LENGTH_CFG.get(body.length_minutes, _LENGTH_CFG[5])
+    target = cfg["target_words"]
+    stories_text = "\n\n".join(
+        f"{i + 1}. {c['title']}\n   {c['snippet']}"
+        for i, c in enumerate(cards)
+    )
+
+    script_prompt = (
+        'You are a podcast writer for a daily news show called "Lowpass." '
+        f'Write a solo-host script for a {body.length_minutes}-minute episode '
+        f'focused on "{body.topic}" based on the stories below.\n\n'
+        f"LENGTH: Your script must be {target} words — not shorter, not longer. "
+        f"This is a hard requirement. A {body.length_minutes}-minute episode at normal speaking pace is {target} words.\n\n"
+        "TONE AND STYLE:\n"
+        "- Conversational and intelligent — like a trusted friend who reads everything so you don't have to\n"
+        "- Present tense, active voice\n"
+        "- No bullet points, no headers in the script itself — flowing speech only\n"
+        "- Vary sentence length to sound natural when read aloud\n"
+        "- Avoid saying \"firstly,\" \"secondly,\" etc. — transition naturally between stories\n\n"
+        "STRUCTURE:\n"
+        f"1. Brief cold open (1-2 sentences) hooking the listener on the biggest development in {body.topic}\n"
+        "2. Cover each story with 2-4 sentences: what happened, why it matters, what to watch for\n"
+        "3. Tie the stories together at the end — what pattern or tension runs through today's coverage\n"
+        "4. Close with a single memorable line the listener will carry with them\n\n"
+        "RULES:\n"
+        '- Never say "In today\'s episode" or "Welcome back" — start immediately with the hook\n'
+        "- Don't read out URLs or source names\n"
+        "- Speak directly to \"you\" (the listener) occasionally to keep it personal\n"
+        "- Write exactly as it should be spoken — no stage directions, no [PAUSE], no formatting\n"
+        f"- Write until you reach {target} words; do not stop early\n\n"
+        f"STORIES:\n{stories_text}\n\n"
+        f"Write the full {target}-word script now, starting with the cold open."
+    )
+
+    with claude.messages.stream(
+        model=CLAUDE_MODEL,
+        max_tokens=cfg["max_tokens"],
+        messages=[{"role": "user", "content": script_prompt}],
+    ) as stream:
+        script = stream.get_final_message().content[0].text.strip()
+
+    audio_b64 = None
+    gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
+    if gcp_key:
+        audio_b64 = _synthesize_speech(script, gcp_key)
+
+    return {"audio_b64": audio_b64, "stories": cards}
+
+
 @app.post("/cards/summarize")
 def summarize_saved_cards(body: SummarizeCardsIn):
     """Generate a podcast script from swiped-right cards and synthesize audio."""

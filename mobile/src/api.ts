@@ -5,6 +5,7 @@ const TIMEOUT_MS: Record<string, number> = {
   "/digest": 180_000,          // 3 min
   "/cards/daily": 120_000,     // 2 min — cold start + fetch + LLM annotation
   "/cards/summarize": 120_000, // 2 min — cold start + LLM + TTS
+  "/topic/podcast": 180_000,   // 3 min — fetch + annotation + LLM + TTS
   default: 60_000,             // 1 min
 };
 
@@ -72,6 +73,17 @@ export const api = {
     request("/digest", token, {
       method: "POST",
       body: JSON.stringify({ topic, focus, timeframe_days: timeframeDays }),
+    }),
+
+  topicPodcast: (
+    token: string,
+    topic: string,
+    lengthMinutes: number = 5,
+    timeframeDays: number = 30,
+  ): Promise<{ audio_b64: string | null; stories: { title: string; snippet: string }[] }> =>
+    request("/topic/podcast", token, {
+      method: "POST",
+      body: JSON.stringify({ topic, length_minutes: lengthMinutes, timeframe_days: timeframeDays }),
     }),
 
   getDailyCards: (): Promise<{ id: string; title: string; tag: string; snippet: string }[]> =>
