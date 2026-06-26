@@ -678,6 +678,8 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
         messages=[{"role": "user", "content": script_prompt}],
     ) as stream:
         script = stream.get_final_message().content[0].text.strip()
+    if script.startswith("```"):
+        script = script.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
     audio_b64 = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
@@ -745,6 +747,8 @@ def summarize_saved_cards(body: SummarizeCardsIn):
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         script = stream.get_final_message().content[0].text.strip()
+    if script.startswith("```"):
+        script = script.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
     audio_b64 = None
     gcp_key = os.environ.get("GOOGLE_TTS_API_KEY")
