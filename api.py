@@ -500,10 +500,8 @@ def _run_streaming_tts(client, streaming_config, input_kwargs) -> bytes | None:
 
 
 def _synthesize_speech(ssml: str, api_key: str, voice: str = "en-US-Chirp3-HD-Charon") -> str | None:
-    """Synthesize using Chirp3-HD streaming gRPC API. Returns base64 WAV."""
-    import io
+    """Synthesize using Chirp3-HD streaming gRPC API. Returns base64 MP3."""
     import re
-    import wave
 
     try:
         from google.api_core.client_options import ClientOptions
@@ -520,7 +518,6 @@ def _synthesize_speech(ssml: str, api_key: str, voice: str = "en-US-Chirp3-HD-Ch
             voice=texttospeech.VoiceSelectionParams(name=voice, language_code="en-US")
         )
 
-        # Try SSML first; if the streaming API rejects it, fall back to plain text
         pcm_data = None
         for input_kwargs in [{"ssml": ssml}, {"text": re.sub(r"<[^>]+>", " ", ssml).strip()}]:
             try:
@@ -533,13 +530,14 @@ def _synthesize_speech(ssml: str, api_key: str, voice: str = "en-US-Chirp3-HD-Ch
         if not pcm_data:
             return None
 
-        buf = io.BytesIO()
-        with wave.open(buf, "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(24000)
-            wf.writeframes(pcm_data)
-        return base64.b64encode(buf.getvalue()).decode()
+        import lameenc
+        encoder = lameenc.Encoder()
+        encoder.set_bit_rate(128)
+        encoder.set_in_sample_rate(24000)
+        encoder.set_channels(1)
+        encoder.set_quality(2)
+        mp3_data = encoder.encode(pcm_data) + encoder.flush()
+        return base64.b64encode(mp3_data).decode()
 
     except Exception as e:
         print(f"[tts] streaming failed: {e}", file=sys.stderr)

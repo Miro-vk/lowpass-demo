@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api";
 import LengthPicker from "../components/LengthPicker";
@@ -55,13 +56,13 @@ export default function CardSwipeScreen({ navigation, route }: any) {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   }
 
-  async function loadAudio(b64: string) {
+  async function loadAudio(uri: string) {
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
       staysActiveInBackground: true,
     });
     const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: `data:audio/wav;base64,${b64}` },
+      { uri },
       { shouldPlay: false }
     );
     newSound.setOnPlaybackStatusUpdate((status) => {
@@ -182,11 +183,19 @@ export default function CardSwipeScreen({ navigation, route }: any) {
         voiceName,
       );
       if (res.audio_b64) {
-        loadAudio(res.audio_b64).catch(() => {});
+        const id = Date.now().toString();
+        const dir = FileSystem.documentDirectory + "podcasts/";
+        const fileUri = `${dir}podcast_${id}.mp3`;
+        await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+        await FileSystem.writeAsStringAsync(fileUri, res.audio_b64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        loadAudio(fileUri).catch(() => {});
         addRun({
-          id: Date.now().toString(),
+          id,
           topic: category === "WHATS_HOT" ? "WHAT'S HOT" : category,
           timestamp: new Date(),
+          audioPath: fileUri,
         });
       }
     } catch {
