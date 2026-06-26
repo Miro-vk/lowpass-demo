@@ -36,6 +36,7 @@ export default function CardSwipeScreen({ navigation, route }: any) {
   const [saved, setSaved] = useState<NewsCard[]>([]);
   const savedRef = useRef<NewsCard[]>([]);
   const [done, setDone] = useState(false);
+  const [swiperKey, setSwiperKey] = useState(0);
   const [generating, setGenerating] = useState(false);
   const [lengthMinutes, setLengthMinutes] = useState(5);
   const lengthMinutesRef = useRef(5);
@@ -211,6 +212,13 @@ export default function CardSwipeScreen({ navigation, route }: any) {
     navigation.goBack();
   }
 
+  function retry() {
+    setSaved([]);
+    savedRef.current = [];
+    setDone(false);
+    setSwiperKey(k => k + 1);
+  }
+
   const renderCard = useCallback((card: NewsCard) => (
     <View style={S.cardShadow}>
       <View style={S.card}>
@@ -272,6 +280,12 @@ export default function CardSwipeScreen({ navigation, route }: any) {
             <View style={S.center}>
               <Text style={S.emptyTitle}>YOU SKIPPED EVERYTHING</Text>
               <Text style={S.emptySub}>Swipe right on stories to build your podcast.</Text>
+              <TouchableOpacity style={S.retryBtn} onPress={retry} activeOpacity={0.8}>
+                <View style={S.retryInner}>
+                  <Ionicons name="refresh" size={14} color={C.bg} />
+                  <Text style={S.retryLabel}>RETRY</Text>
+                </View>
+              </TouchableOpacity>
             </View>
           ) : generating ? (
             <View style={S.center}>
@@ -382,6 +396,7 @@ export default function CardSwipeScreen({ navigation, route }: any) {
 
       <View style={S.deck}>
         <Swiper
+          key={swiperKey}
           ref={swiperRef}
           cards={cards}
           renderCard={renderCard}
@@ -503,6 +518,7 @@ function makeStyles(C: Colors) {
       borderWidth: 2, borderColor: C.text,
     },
     retryLabel: { color: C.bg, fontWeight: "900", fontSize: 12, letterSpacing: 2 },
+    retryInner: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8 },
 
     deck: { flex: 1, alignItems: "center" },
 
