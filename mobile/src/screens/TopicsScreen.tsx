@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
+import LowpassLoaderLight from "../components/LowpassLoaderLight";
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, RefreshControl,
+  StyleSheet, Alert, RefreshControl,
 } from "react-native";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
@@ -83,7 +84,7 @@ export default function TopicsScreen({ navigation }: any) {
           onChangeText={setFocus}
         />
         <TouchableOpacity style={styles.button} onPress={handleAdd} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Add topic</Text>}
+          {loading ? <LowpassLoaderLight compact /> : <Text style={styles.buttonText}>Add topic</Text>}
         </TouchableOpacity>
       </View>
 

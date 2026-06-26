@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Dimensions, ActivityIndicator, ScrollView, Image, PanResponder,
+  Dimensions, ScrollView, Image, PanResponder,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
@@ -11,6 +11,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api";
 import LengthPicker from "../components/LengthPicker";
 import LowpassIcon from "../components/LowpassIcon";
+import LowpassLoaderLight from "../components/LowpassLoaderLight";
+import LowpassLoaderDark from "../components/LowpassLoaderDark";
 import { useTheme, Colors } from "../context/ThemeContext";
 import { useVoice } from "../context/VoiceContext";
 import { useHistory } from "../context/HistoryContext";
@@ -236,7 +238,7 @@ export default function CardSwipeScreen({ navigation, route }: any) {
     return (
       <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
         <View style={S.center}>
-          <ActivityIndicator size="large" color={C.text} />
+          {isDark ? <LowpassLoaderDark showLabel={false} /> : <LowpassLoaderLight showLabel={false} />}
           <Text style={S.loadingText}>FETCHING TODAY'S STORIES…</Text>
           <Text style={S.loadingHint}>First load may take ~30s</Text>
         </View>
@@ -279,9 +281,9 @@ export default function CardSwipeScreen({ navigation, route }: any) {
             </View>
           ) : generating ? (
             <View style={S.center}>
-              <ActivityIndicator size="large" color={C.text} />
-              <Text style={S.loadingText}>PRODUCING YOUR PODCAST…</Text>
-              <Text style={S.loadingHint}>Writing script and generating audio</Text>
+              {isDark
+                ? <LowpassLoaderDark phrases={["writing the script…", "generating audio…", "filtering the noise…", "nearly there…"]} />
+                : <LowpassLoaderLight phrases={["writing the script…", "generating audio…", "filtering the noise…", "nearly there…"]} />}
             </View>
           ) : (
             <>

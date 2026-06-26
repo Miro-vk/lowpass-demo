@@ -1,10 +1,12 @@
 import { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import LowpassIcon from "../components/LowpassIcon";
+import LowpassLoaderLight from "../components/LowpassLoaderLight";
+import LowpassLoaderDark from "../components/LowpassLoaderDark";
 import { api } from "../api";
 import { useTheme, Colors } from "../context/ThemeContext";
 
@@ -78,7 +80,9 @@ export default function SignupScreen({ navigation }: any) {
               disabled={loading}
               activeOpacity={0.85}
             >
-              {loading ? <ActivityIndicator color={C.bg} /> : <Text style={S.btnText}>CREATE ACCOUNT</Text>}
+              {loading
+                ? (isDark ? <LowpassLoaderDark compact /> : <LowpassLoaderLight compact />)
+                : <Text style={S.btnText}>CREATE ACCOUNT</Text>}
             </TouchableOpacity>
           </View>
 

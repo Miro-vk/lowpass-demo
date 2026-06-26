@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Alert,
+  StyleSheet, Alert,
   Dimensions, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,6 +10,8 @@ import { useAuth } from "../context/AuthContext";
 import { useHistory } from "../context/HistoryContext";
 import { useTheme, Colors } from "../context/ThemeContext";
 import LowpassIcon from "../components/LowpassIcon";
+import LowpassLoaderLight from "../components/LowpassLoaderLight";
+import LowpassLoaderDark from "../components/LowpassLoaderDark";
 import LengthPicker from "../components/LengthPicker";
 import TimeframePicker from "../components/TimeframePicker";
 import PodcastPlayer from "../components/PodcastPlayer";
@@ -84,7 +86,7 @@ export default function DigestScreen() {
             >
               {loading ? (
                 <View style={S.runBtnInner}>
-                  <ActivityIndicator color={C.bg} size="small" />
+                  {isDark ? <LowpassLoaderDark compact /> : <LowpassLoaderLight compact />}
                   <Text style={S.runBtnText}>FILTERING…</Text>
                 </View>
               ) : (

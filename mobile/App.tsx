@@ -1,5 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
+import LowpassLoaderLight from "./src/components/LowpassLoaderLight";
+import LowpassLoaderDark from "./src/components/LowpassLoaderDark";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -62,12 +64,12 @@ function MainTabs() {
 
 function Navigator() {
   const { token, loading } = useAuth();
-  const { C } = useTheme();
+  const { isDark, C } = useTheme();
 
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color={C.text} />
+        {isDark ? <LowpassLoaderDark showLabel={false} /> : <LowpassLoaderLight showLabel={false} />}
       </View>
     );
   }
