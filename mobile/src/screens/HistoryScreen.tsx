@@ -31,7 +31,7 @@ export default function HistoryScreen() {
         {history.length === 0 ? (
           <View style={S.empty}>
             <Text style={S.emptyTitle}>NO HISTORY YET</Text>
-            <Text style={S.emptyHint}>Generate a podcast on the Search tab to get started.</Text>
+            <Text style={S.emptyHint}>Swipe cards and generate a podcast to get started.</Text>
           </View>
         ) : (
           history.map((run) => (

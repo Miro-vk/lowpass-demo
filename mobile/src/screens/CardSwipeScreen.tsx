@@ -12,6 +12,7 @@ import LengthPicker from "../components/LengthPicker";
 import LowpassIcon from "../components/LowpassIcon";
 import { useTheme, Colors } from "../context/ThemeContext";
 import { useVoice } from "../context/VoiceContext";
+import { useHistory } from "../context/HistoryContext";
 
 const { width: W, height: H } = Dimensions.get("window");
 const YES = "#2E7D32";
@@ -23,6 +24,7 @@ export default function CardSwipeScreen({ navigation, route }: any) {
   const category: string = route?.params?.category ?? "WHATS_HOT";
   const { isDark, C } = useTheme();
   const { voiceName } = useVoice();
+  const { addRun } = useHistory();
   const S = useMemo(() => makeStyles(C), [C]);
   const swiperRef = useRef<Swiper<NewsCard>>(null);
   const [cards, setCards] = useState<NewsCard[]>([]);
@@ -181,6 +183,11 @@ export default function CardSwipeScreen({ navigation, route }: any) {
       );
       if (res.audio_b64) {
         loadAudio(res.audio_b64).catch(() => {});
+        addRun({
+          id: Date.now().toString(),
+          topic: category === "WHATS_HOT" ? "WHAT'S HOT" : category,
+          timestamp: new Date(),
+        });
       }
     } catch {
       // podcast generation failed silently — no audio will appear
