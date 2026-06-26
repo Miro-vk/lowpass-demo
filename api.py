@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 from digest import (
-    fetch_hn, fetch_youtube, fetch_x,
+    fetch_hn, fetch_youtube, fetch_x, fetch_reddit,
     fetch_hn_trending, fetch_nyt_trending, fetch_nyt_section,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
@@ -260,7 +260,7 @@ _category_caches: dict[str, tuple[list, float]] = {}
 
 # Sources used for each specific category
 _CATEGORY_SOURCES: dict[str, dict] = {
-    "SPORTS":   {"nyt": ["sports"]},                                # HN omitted — sports content doesn't exist on HN
+    "SPORTS":   {"nyt": ["sports"], "reddit": "sports nba nfl soccer"},
     "TECH":     {"nyt": ["technology"],          "hn": None},      # None → use HN trending
     "BUSINESS": {"nyt": ["business"],            "hn": "startup business economy"},
     "WORLD":    {"nyt": ["world"],               "hn": "politics government geopolitics"},
@@ -270,7 +270,7 @@ _CATEGORY_SOURCES: dict[str, dict] = {
 
 
 def _annotate_snippets(titles: list[str], api_key: str) -> list[str]:
-    """Ask Claude to generate a one-sentence snippet for each title. Returns list of strings."""
+    """Ask Claude to generate a one-sentence hook for each title. Returns list of strings."""
     import json as _json
     snippets = [""] * len(titles)
     if not api_key or not titles:
@@ -278,8 +278,10 @@ def _annotate_snippets(titles: list[str], api_key: str) -> list[str]:
     claude = anthropic.Anthropic(api_key=api_key)
     prompt = (
         "For each news story title, return a JSON array with one object per story (same order).\n"
-        '  Each object must have "snippet": one sentence (max 25 words) explaining why this story matters.\n'
-        "  If a title is too vague or unclear, set snippet to empty string.\n"
+        '  Each object must have "snippet": one punchy sentence (max 25 words) that hooks the reader.\n'
+        "  Lead from the most surprising, counterintuitive, or high-stakes angle — not a restatement of the title.\n"
+        "  Make the reader feel they'll miss something important if they skip this.\n"
+        "  If a title is too vague or unclear to write a genuine hook for, set snippet to empty string.\n"
         "Return ONLY valid JSON, no markdown.\n\n"
         "TITLES:\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
     )
@@ -344,12 +346,12 @@ def _build_whats_hot() -> list:
             "For each story title, return a JSON array (one object per story, same order).\n"
             "Each object must have:\n"
             '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, CULTURE, SPORTS, OTHER\n'
-            '  "snippet": one sentence (max 25 words) explaining why this story matters\n\n'
+            '  "snippet": one punchy sentence (max 25 words) that hooks the reader — lead from the most surprising or high-stakes angle, not a restatement of the title\n\n'
             "Tag guidance: TECH covers AI/software/hardware/cybersecurity; "
             "WORLD covers politics/foreign affairs/policy; "
             "SCIENCE covers health/medicine/environment/research; "
             "SPORTS covers any sport, athlete, or sporting event.\n"
-            "If a title is too vague, set snippet to empty string.\n"
+            "If a title is too vague to write a genuine hook for, set snippet to empty string.\n"
             "Return ONLY valid JSON, no markdown.\n\n"
             "TITLES:\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
         )
@@ -410,6 +412,8 @@ def _build_category_cards(cat: str) -> list:
         posts += normalize_source_scores(fetch_hn_trending(30))
     elif sources["hn"]:
         posts += normalize_source_scores(fetch_hn(sources["hn"], 20, 7))
+    if sources.get("reddit"):
+        posts += normalize_source_scores(fetch_reddit(sources["reddit"], 20, 7))
     if not posts:
         return []
     ranked = [
@@ -483,9 +487,9 @@ def get_daily_cards(category: str = "WHATS_HOT"):
 
 
 _LENGTH_CFG = {
-    2:  {"target_words": 280,  "max_tokens": 600},
-    5:  {"target_words": 700,  "max_tokens": 1400},
-    10: {"target_words": 1400, "max_tokens": 2600},
+    2:  {"target_words": 330,  "max_tokens": 800},
+    5:  {"target_words": 820,  "max_tokens": 1800},
+    10: {"target_words": 1650, "max_tokens": 3200},
 }
 
 
