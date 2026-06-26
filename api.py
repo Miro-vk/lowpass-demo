@@ -14,7 +14,10 @@ Endpoints:
 import os
 import sys
 import base64
+import time
+import threading
 import requests
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 load_dotenv("local.env")
 
@@ -34,7 +37,14 @@ from digest import (
 CLAUDE_MODEL = "claude-sonnet-4-6"
 CLAUDE_MODEL_FAST = "claude-haiku-4-5-20251001"
 
-app = FastAPI(title="Lowpass Digest API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    threading.Thread(target=_prewarm_loop, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="Lowpass Digest API", lifespan=lifespan)
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_ANON_KEY = os.environ["SUPABASE_ANON_KEY"]
@@ -407,10 +417,40 @@ def _build_category_cards(cat: str) -> list:
     return _clusters_to_cards(ranked, snippets, cat)
 
 
+def _prewarm_loop():
+    """Pre-warm all category caches at startup, then refresh every hour."""
+    while True:
+        categories = ["WHATS_HOT"] + list(_CATEGORY_SOURCES.keys())
+
+        def _warm(cat: str):
+            try:
+                if cat == "WHATS_HOT":
+                    global _cards_pool, _cards_pool_ts
+                    pool = _build_whats_hot()
+                    if pool:
+                        _cards_pool = pool
+                        _cards_pool_ts = time.time()
+                        print(f"[prewarm] WHATS_HOT ready ({len(pool)} cards)", file=sys.stderr)
+                else:
+                    cards = _build_category_cards(cat)
+                    if cards:
+                        _category_caches[cat] = (cards, time.time())
+                        print(f"[prewarm] {cat} ready ({len(cards)} cards)", file=sys.stderr)
+            except Exception as e:
+                print(f"[prewarm] {cat} failed: {e}", file=sys.stderr)
+
+        threads = [threading.Thread(target=_warm, args=(cat,), daemon=True) for cat in categories]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        time.sleep(_CARDS_TTL)
+
+
 @app.get("/cards/daily", response_model=list[CardItem])
 def get_daily_cards(category: str = "WHATS_HOT"):
     """10 cards for the requested category. WHATS_HOT returns the most-engaged overall."""
-    import time
     global _cards_pool, _cards_pool_ts, _category_caches
 
     cat = category.upper()
