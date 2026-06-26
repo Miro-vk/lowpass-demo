@@ -69,6 +69,9 @@ function Navigator() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: C.bg, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ fontSize: 28, fontWeight: "900", color: C.text, letterSpacing: 6, marginBottom: 32 }}>
+          LOWPASS
+        </Text>
         {isDark ? <LowpassLoaderDark showLabel={false} /> : <LowpassLoaderLight showLabel={false} />}
       </View>
     );

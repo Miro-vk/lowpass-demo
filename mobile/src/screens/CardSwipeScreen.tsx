@@ -265,12 +265,6 @@ export default function CardSwipeScreen({ navigation, route }: any) {
       <SafeAreaView style={S.safe} edges={["top", "bottom"]}>
         <View style={S.header}>
           <Text style={S.headerTitle}>{category === "WHATS_HOT" ? "WHAT'S HOT" : category} PODCAST</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <LengthPicker value={lengthMinutes} onChange={setLengthMinutes} textColor={C.text} bgColor={C.bg} />
-            <TouchableOpacity onPress={reset}>
-              <Text style={S.refreshLabel}>NEW TOPIC</Text>
-            </TouchableOpacity>
-          </View>
         </View>
 
         <ScrollView contentContainerStyle={S.reportContainer}>
@@ -282,8 +276,8 @@ export default function CardSwipeScreen({ navigation, route }: any) {
           ) : generating ? (
             <View style={S.center}>
               {isDark
-                ? <LowpassLoaderDark phrases={["writing the script…", "generating audio…", "filtering the noise…", "nearly there…"]} />
-                : <LowpassLoaderLight phrases={["writing the script…", "generating audio…", "filtering the noise…", "nearly there…"]} />}
+                ? <LowpassLoaderDark phrases={["writing the script…", "generating audio…", "filtering the noise…"]} />
+                : <LowpassLoaderLight phrases={["writing the script…", "generating audio…", "filtering the noise…"]} />}
             </View>
           ) : (
             <>
@@ -340,11 +334,17 @@ export default function CardSwipeScreen({ navigation, route }: any) {
                       </Text>
                     </View>
                   </TouchableOpacity>
+                  <TouchableOpacity style={S.newTopicBtn} onPress={reset} activeOpacity={0.8}>
+                    <Text style={S.newTopicLabel}>NEW TOPIC</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View style={S.podcastError}>
                   <Text style={S.podcastErrorText}>AUDIO UNAVAILABLE</Text>
                   <Text style={S.podcastErrorSub}>Could not generate podcast audio.</Text>
+                  <TouchableOpacity style={S.newTopicBtn} onPress={reset} activeOpacity={0.8}>
+                    <Text style={S.newTopicLabel}>NEW TOPIC</Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
@@ -583,11 +583,19 @@ function makeStyles(C: Colors) {
       borderColor: C.border,
       paddingVertical: 16,
       alignItems: "center" as const,
-      marginBottom: 32,
+      marginBottom: 12,
     },
     playBtnBusy: { opacity: 0.5 },
     playBtnInner: { flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
     playBtnText: { color: C.bg, fontWeight: "900" as const, fontSize: 13, letterSpacing: 2 },
+    newTopicBtn: {
+      borderWidth: 2,
+      borderColor: C.border,
+      paddingVertical: 14,
+      alignItems: "center" as const,
+      marginBottom: 32,
+    },
+    newTopicLabel: { fontSize: 11, fontWeight: "900" as const, color: C.text, letterSpacing: 2 },
     reportBody: { fontSize: 15, color: C.text, lineHeight: 26 },
 
     savedLabel: {
