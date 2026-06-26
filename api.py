@@ -260,7 +260,7 @@ _category_caches: dict[str, tuple[list, float]] = {}
 
 # Sources used for each specific category
 _CATEGORY_SOURCES: dict[str, dict] = {
-    "SPORTS":   {"nyt": ["sports"],              "hn": "sports"},
+    "SPORTS":   {"nyt": ["sports"]},                                # HN omitted — sports content doesn't exist on HN
     "TECH":     {"nyt": ["technology"],          "hn": None},      # None → use HN trending
     "BUSINESS": {"nyt": ["business"],            "hn": "startup business economy"},
     "WORLD":    {"nyt": ["world"],               "hn": "politics government geopolitics"},
@@ -326,15 +326,15 @@ def _build_whats_hot() -> list:
     """Top 10 most-engaged stories across all categories, with tags."""
     import json as _json
     all_posts = (
-        normalize_source_scores(fetch_hn_trending(40)) +
-        normalize_source_scores(fetch_nyt_trending(25))
+        normalize_source_scores(fetch_hn_trending(20)) +
+        normalize_source_scores(fetch_nyt_trending(40))
     )
     if not all_posts:
         return []
     ranked = [
         c for c in sorted(cluster_posts(all_posts), key=score_cluster, reverse=True)
         if len((_cluster_representative(c).get("title") or "").strip()) >= 8
-    ][:20]
+    ][:25]
     titles = [_cluster_representative(c).get("title") or "" for c in ranked]
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     annotations = [{"tag": "OTHER", "snippet": ""}] * len(titles)
@@ -372,15 +372,20 @@ def _build_whats_hot() -> list:
         except Exception:
             pass
     cards: list[CardItem] = []
+    tech_count = 0
     for i, cluster in enumerate(ranked):
         if len(cards) >= 10:
             break
         ann = annotations[i]
+        if ann["tag"] == "TECH" and tech_count >= 4:
+            continue
         if not ann["snippet"] or any(s in ann["snippet"].lower() for s in _BAD_SNIPPET_SIGNALS):
             continue
         rep = _cluster_representative(cluster)
         has_nyt = any(p.get("source") == "nyt" for p in cluster)
         safe_image = None if rep.get("source") == "nyt" else rep.get("image_url")
+        if ann["tag"] == "TECH":
+            tech_count += 1
         cards.append(CardItem(
             id=str(len(cards)),
             title=(rep.get("title") or "").strip(),
@@ -396,13 +401,15 @@ def _build_category_cards(cat: str) -> list:
     """Fetch from category-specific sources and return up to 10 cards tagged as cat."""
     sources = _CATEGORY_SOURCES.get(cat, {})
     posts = []
+    nyt_limit = 30 if "hn" not in sources else 20
     for section in sources.get("nyt", []):
-        posts += normalize_source_scores(fetch_nyt_section(section, 20))
-    hn_topic = sources.get("hn")
-    if hn_topic is None:
+        posts += normalize_source_scores(fetch_nyt_section(section, nyt_limit))
+    if "hn" not in sources:
+        pass  # category explicitly has no HN source
+    elif sources["hn"] is None:
         posts += normalize_source_scores(fetch_hn_trending(30))
-    elif hn_topic:
-        posts += normalize_source_scores(fetch_hn(hn_topic, 20, 7))
+    elif sources["hn"]:
+        posts += normalize_source_scores(fetch_hn(sources["hn"], 20, 7))
     if not posts:
         return []
     ranked = [
