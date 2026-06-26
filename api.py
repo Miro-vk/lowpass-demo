@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from supabase import create_client, Client
 
 from digest import (
-    fetch_hn, fetch_youtube, fetch_x, fetch_reddit,
+    fetch_hn, fetch_youtube, fetch_x,
     fetch_hn_trending, fetch_nyt_trending, fetch_nyt_section,
     cluster_posts, score_cluster, _cluster_key,
     _cluster_representative, synthesize_cluster, synthesize_digest,
@@ -260,7 +260,7 @@ _category_caches: dict[str, tuple[list, float]] = {}
 
 # Sources used for each specific category
 _CATEGORY_SOURCES: dict[str, dict] = {
-    "SPORTS":   {"nyt": ["sports"], "reddit": "sports nba nfl soccer"},
+    "SPORTS":   {"nyt": ["sports"]},
     "TECH":     {"nyt": ["technology"],          "hn": None},      # None → use HN trending
     "BUSINESS": {"nyt": ["business"],            "hn": "startup business economy"},
     "WORLD":    {"nyt": ["world"],               "hn": "politics government geopolitics"},
@@ -269,21 +269,21 @@ _CATEGORY_SOURCES: dict[str, dict] = {
 }
 
 
-def _annotate_snippets(titles: list[str], api_key: str) -> list[str]:
-    """Ask Claude to generate a one-sentence hook for each title. Returns list of strings."""
+def _annotate_snippets(entries: list[str], api_key: str) -> list[str]:
+    """Ask Claude to generate a one-sentence hook per story entry (title or title+abstract)."""
     import json as _json
-    snippets = [""] * len(titles)
-    if not api_key or not titles:
+    snippets = [""] * len(entries)
+    if not api_key or not entries:
         return snippets
     claude = anthropic.Anthropic(api_key=api_key)
     prompt = (
-        "For each news story title, return a JSON array with one object per story (same order).\n"
+        "For each news story, return a JSON array with one object per story (same order).\n"
         '  Each object must have "snippet": one punchy sentence (max 25 words) that hooks the reader.\n'
         "  Lead from the most surprising, counterintuitive, or high-stakes angle — not a restatement of the title.\n"
         "  Make the reader feel they'll miss something important if they skip this.\n"
         "  If a title is too vague or unclear to write a genuine hook for, set snippet to empty string.\n"
         "Return ONLY valid JSON, no markdown.\n\n"
-        "TITLES:\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
+        "STORIES:\n" + "\n".join(f"{i+1}. {e}" for i, e in enumerate(entries))
     )
     try:
         with anthropic.Anthropic(api_key=api_key).messages.stream(
@@ -294,7 +294,7 @@ def _annotate_snippets(titles: list[str], api_key: str) -> list[str]:
             raw = stream.get_final_message().content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        for i, obj in enumerate(_json.loads(raw)[:len(titles)]):
+        for i, obj in enumerate(_json.loads(raw)[:len(entries)]):
             snippets[i] = (obj.get("snippet") or "").strip()
     except Exception:
         pass
@@ -412,8 +412,6 @@ def _build_category_cards(cat: str) -> list:
         posts += normalize_source_scores(fetch_hn_trending(30))
     elif sources["hn"]:
         posts += normalize_source_scores(fetch_hn(sources["hn"], 20, 7))
-    if sources.get("reddit"):
-        posts += normalize_source_scores(fetch_reddit(sources["reddit"], 20, 7))
     if not posts:
         return []
     ranked = [
@@ -422,9 +420,14 @@ def _build_category_cards(cat: str) -> list:
     ][:15]
     if not ranked:
         return []
-    titles = [_cluster_representative(c).get("title") or "" for c in ranked]
+    entries = []
+    for c in ranked:
+        rep = _cluster_representative(c)
+        title = (rep.get("title") or "").strip()
+        abstract = (rep.get("selftext") or "").strip()
+        entries.append(f"{title}: {abstract}" if abstract else title)
     api_key = os.environ.get("ANTHROPIC_API_KEY")
-    snippets = _annotate_snippets(titles, api_key or "")
+    snippets = _annotate_snippets(entries, api_key or "")
     return _clusters_to_cards(ranked, snippets, cat)
 
 

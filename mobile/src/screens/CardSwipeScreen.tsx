@@ -7,6 +7,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Swiper from "react-native-deck-swiper";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
+import * as StoreReview from "expo-store-review";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { api } from "../api";
 import LengthPicker from "../components/LengthPicker";
@@ -59,6 +61,24 @@ export default function CardSwipeScreen({ navigation, route }: any) {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   }
 
+  async function maybeRequestReview() {
+    try {
+      const [countStr, alreadyAsked] = await Promise.all([
+        AsyncStorage.getItem("podcastsCompleted"),
+        AsyncStorage.getItem("reviewRequested"),
+      ]);
+      if (alreadyAsked) return;
+      const count = parseInt(countStr ?? "0", 10) + 1;
+      await AsyncStorage.setItem("podcastsCompleted", String(count));
+      if (count >= 3 && await StoreReview.hasAction()) {
+        await AsyncStorage.setItem("reviewRequested", "true");
+        await StoreReview.requestReview();
+      }
+    } catch {
+      // non-critical — never interrupt the user experience
+    }
+  }
+
   async function loadAudio(uri: string) {
     await Audio.setAudioModeAsync({
       playsInSilentModeIOS: true,
@@ -81,6 +101,7 @@ export default function CardSwipeScreen({ navigation, route }: any) {
         setPlaying(false);
         // Reset to start so pressing play replays from the beginning
         newSound.setPositionAsync(0).catch(() => {});
+        maybeRequestReview();
       }
     });
 
