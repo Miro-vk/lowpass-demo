@@ -19,7 +19,7 @@ const CATEGORIES = [
   { id: "WORLD",    label: "WORLD" },
   { id: "SCIENCE",  label: "SCIENCE" },
   { id: "CULTURE",  label: "CULTURE" },
-  { id: "SPORTS",   label: "SPORTS" },
+  { id: "HEALTH",   label: "HEALTH" },
 ];
 
 export default function TopicSelectScreen({ navigation }: any) {

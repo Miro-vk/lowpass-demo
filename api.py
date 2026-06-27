@@ -246,7 +246,7 @@ class SummarizeCardsIn(BaseModel):
     voice: str = "en-US-Chirp3-HD-Charon"
 
 
-_VALID_TAGS = {"TECH", "BUSINESS", "WORLD", "SCIENCE", "CULTURE", "SPORTS", "OTHER"}
+_VALID_TAGS = {"TECH", "BUSINESS", "WORLD", "SCIENCE", "HEALTH", "CULTURE", "OTHER"}
 _BAD_SNIPPET_SIGNALS = ("unclear", "insufficient", "cannot determine", "no information", "not enough information")
 
 _CARDS_TTL = 3600  # 1 hour
@@ -260,11 +260,11 @@ _category_caches: dict[str, tuple[list, float]] = {}
 
 # Sources used for each specific category
 _CATEGORY_SOURCES: dict[str, dict] = {
-    "SPORTS":   {"nyt": ["sports"]},
+    "HEALTH":   {"nyt": ["health"]},
     "TECH":     {"nyt": ["technology"],          "hn": None},      # None → use HN trending
     "BUSINESS": {"nyt": ["business"],            "hn": "startup business economy"},
     "WORLD":    {"nyt": ["world"],               "hn": "politics government geopolitics"},
-    "SCIENCE":  {"nyt": ["science", "health"],   "hn": "science research climate"},
+    "SCIENCE":  {"nyt": ["science"],             "hn": "science research climate"},
     "CULTURE":  {"nyt": ["arts"],                "hn": "film music art books"},
 }
 
@@ -328,8 +328,8 @@ def _build_whats_hot() -> list:
     """Top 10 most-engaged stories across all categories, with tags."""
     import json as _json
     all_posts = (
-        normalize_source_scores(fetch_hn_trending(20)) +
-        normalize_source_scores(fetch_nyt_trending(40))
+        normalize_source_scores(fetch_hn_trending(30)) +
+        normalize_source_scores(fetch_nyt_trending(30))
     )
     if not all_posts:
         return []
@@ -345,12 +345,12 @@ def _build_whats_hot() -> list:
         prompt = (
             "For each story title, return a JSON array (one object per story, same order).\n"
             "Each object must have:\n"
-            '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, CULTURE, SPORTS, OTHER\n'
+            '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, HEALTH, CULTURE, OTHER\n'
             '  "snippet": one punchy sentence (max 25 words) that hooks the reader — lead from the most surprising or high-stakes angle, not a restatement of the title\n\n'
             "Tag guidance: TECH covers AI/software/hardware/cybersecurity; "
             "WORLD covers politics/foreign affairs/policy; "
-            "SCIENCE covers health/medicine/environment/research; "
-            "SPORTS covers any sport, athlete, or sporting event.\n"
+            "HEALTH covers medicine/public health/drugs/clinical trials/disease; "
+            "SCIENCE covers environment/physics/biology/space/climate research.\n"
             "If a title is too vague to write a genuine hook for, set snippet to empty string.\n"
             "Return ONLY valid JSON, no markdown.\n\n"
             "TITLES:\n" + "\n".join(f"{i+1}. {t}" for i, t in enumerate(titles))
@@ -604,7 +604,7 @@ def topic_podcast(body: TopicPodcastIn, user: AuthedUser = Depends(get_current_u
         annotation_prompt = (
             "For each story title, return a JSON array (one object per story, same order).\n"
             "Each object must have:\n"
-            '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, CULTURE, SPORTS, OTHER\n'
+            '  "tag": one of TECH, BUSINESS, WORLD, SCIENCE, HEALTH, CULTURE, OTHER\n'
             f'  "snippet": one sentence (max 25 words) explaining why this story matters for the topic: {body.topic}\n\n'
             "If a title is too vague or unclear to summarize meaningfully, set snippet to an empty string.\n"
             "Return ONLY valid JSON, no markdown, no explanation.\n\n"
