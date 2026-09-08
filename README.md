@@ -1,37 +1,93 @@
 # Lowpass
 
-Lowpass is a mobile news briefing app that turns a noisy stream of online conversation into a short, listenable update. Users choose topics, set a focus and time window, review ranked story clusters, and listen to an AI-generated podcast-style briefing instead of checking several feeds individually.
+> **A calmer way to keep up.** Turn the internet's loudest conversations into a focused briefing you can read or listen to.
 
-The repository contains the Expo/React Native mobile client and the FastAPI service that collects stories, clusters related coverage, generates summaries, and synthesizes speech.
+Lowpass is a mobile news discovery and briefing app. Choose what matters to you, swipe through what is happening now, and generate a short AI-narrated update from stories gathered across multiple sources.
 
-## Capabilities
+## The Problem
 
-### Mobile app
+Keeping up with a topic usually means opening several feeds, comparing overlapping headlines, judging which links are worth your time, and still missing the bigger picture. News apps often optimize for more content, while the real need is a clear answer to: “What actually matters about this topic right now?”
 
-- Create an account, sign in, refresh sessions, and sign out.
-- Add, edit through selection, and remove personal topics.
-- Generate a topic digest with an optional focus and a configurable lookback window.
-- See up to five ranked story clusters per digest, including a representative title, source list, score, URL, and synthesized summary.
-- Read an overall themes summary for the digest.
-- Browse daily cards in a swipe-based discovery flow.
-- Browse a general `What's Hot` feed or category feeds such as technology, business, world, science, health, and culture.
-- Select cards and turn them into a narrated briefing.
-- Generate a topic podcast directly from a topic and choose its length and voice.
-- Play generated audio in the built-in podcast player.
-- Keep a local history of digest runs and return to previous results.
-- Choose a preferred narration voice and switch between light and dark themes.
-- Persist authentication tokens and refresh tokens locally with AsyncStorage.
+Lowpass reduces that decision fatigue by combining source discovery, story clustering, concise synthesis, and audio playback in one focused workflow.
 
-### Backend
+## How It Works
 
-- Authenticate users through Supabase Auth and scope protected data to the signed-in user.
-- Fetch topic stories from Hacker News, YouTube, and X for topic digests.
-- Fetch trending and category stories from Hacker News and the New York Times for daily cards.
-- Normalize engagement scores across sources, cluster related posts, rank clusters, and select representative links.
-- Use Anthropic models to summarize story clusters and synthesize a digest-level themes section.
-- Generate speech audio for topic and card briefings with Google Cloud text-to-speech.
-- Cache daily and category card pools for one hour and prewarm popular feeds in the background.
-- Store per-user seen-cluster state in Supabase to support deduplication.
+### 1. Choose a topic
+
+Create an account and add the subjects you want to follow. A topic can include an optional focus, such as a company, technology, event, or question you want the digest to emphasize.
+
+### 2. Set the context
+
+Choose how far back Lowpass should look. The digest request supports a configurable time window, so a topic can be treated as a recent update or a broader briefing.
+
+### 3. Discover stories
+
+Browse a daily card feed one story at a time. Start with `What's Hot` or focus on a category such as technology, business, world, science, health, or culture.
+
+### 4. Read the signal
+
+For a topic digest, Lowpass gathers posts from several sources, groups related coverage, ranks the strongest clusters, and presents up to five stories with source links, engagement scores, and concise summaries. A themes section connects the individual stories into one overview.
+
+### 5. Listen to the briefing
+
+Turn a topic or a selection of daily cards into a podcast-style briefing. Choose the narration length and preferred voice, then play the generated audio in the app.
+
+### 6. Keep a record
+
+Digest runs are kept in local history so a previous briefing can be revisited. The app also tracks seen story clusters for the signed-in user to reduce repeated coverage.
+
+## AI Integration
+
+### Story synthesis
+
+**Technology:** Anthropic Claude
+
+**Purpose:** Summarize each ranked story cluster and synthesize the common themes across a digest.
+
+Lowpass sends grouped source context to the model rather than asking it to summarize an isolated headline. This preserves the relationship between multiple reports while keeping the returned briefing short and readable.
+
+### Speech generation
+
+**Technology:** Google Cloud text-to-speech
+
+**Purpose:** Convert topic and card summaries into playable narrated audio.
+
+The client can request different briefing lengths and voices. Audio is returned as base64 data and played through the mobile podcast player.
+
+### Ranking and clustering
+
+**Technology:** Source normalization and custom ranking pipeline in `digest.py`
+
+**Purpose:** Make stories from different platforms comparable before synthesis.
+
+The backend normalizes source engagement signals, groups related posts, applies recency and engagement scoring, and selects representative links for the highest-ranked clusters. This gives the model a focused set of stories instead of an unfiltered feed.
+
+## Tech Stack
+
+### Mobile
+
+- **Framework:** Expo and React Native
+- **Language:** TypeScript and JSX
+- **Navigation:** React Navigation native stack and bottom tabs
+- **State:** React context providers for auth, history, theme, and voice preferences
+- **Storage:** AsyncStorage for session persistence and local app state
+- **Audio:** Expo AV
+
+### Backend / API
+
+- **Framework:** FastAPI with Uvicorn
+- **Language:** Python
+- **Authentication and database:** Supabase Auth and Postgres
+- **AI summarization:** Anthropic Claude
+- **Speech:** Google Cloud text-to-speech
+- **Validation:** Pydantic request and response models
+
+### Content sources
+
+- Hacker News Algolia API
+- YouTube Data API
+- X API
+- New York Times API
 
 ## Architecture
 
@@ -53,7 +109,7 @@ FastAPI service (api.py)
 
 The deployed mobile client currently points at `https://lowpass-demo.onrender.com`. To use a different service, update `BASE_URL` in `mobile/src/api.ts`.
 
-## Repository layout
+## Project Structure
 
 ```text
 api.py                 FastAPI routes and server-side orchestration
@@ -66,6 +122,50 @@ mobile/src/screens/     Authentication, cards, digest, history, and settings UI
 mobile/src/components/ Shared mobile UI, including audio playback
 mobile/src/context/     Auth, history, theme, and voice state
 ```
+
+## Known Challenges & Solutions
+
+### Challenge: Different sources measure attention differently
+
+**Problem:** A YouTube result, Hacker News post, X post, and newspaper article do not share the same engagement scale.
+
+**Solution:** Lowpass normalizes source scores before clusters are compared, then combines engagement with recency when ranking them.
+
+### Challenge: Duplicate coverage creates noise
+
+**Problem:** The same event can appear as several links across different platforms.
+
+**Solution:** Related posts are clustered before summaries are generated. The API stores per-user seen-cluster keys in Supabase so already-consumed coverage can be recognized.
+
+### Challenge: Briefings are expensive to generate
+
+**Problem:** A request may need source fetching, clustering, multiple model calls, and text-to-speech, especially after a cold server start.
+
+**Solution:** The mobile client uses route-specific timeouts, daily cards are cached for one hour, and popular feeds are prewarmed in the API process.
+
+### Challenge: AI summaries need source context
+
+**Problem:** A short headline alone is not enough to produce a useful briefing.
+
+**Solution:** The backend keeps representative URLs and source names alongside clustered content, then returns summaries that remain linked to the underlying stories.
+
+## Design & UX
+
+- **Card-first discovery:** Daily stories are presented in a swipe-based flow for quick decisions.
+- **Focused reading:** Digest results emphasize a small number of ranked clusters instead of an endless list.
+- **Listen when convenient:** Every podcast request supports configurable length and voice.
+- **Personal controls:** Topic focus, timeframe, narration preference, history, and light/dark theme are available from the mobile app.
+- **Mobile-first interaction:** Navigation, playback, and discovery are designed for touch devices while remaining available through Expo web.
+
+## Performance Considerations
+
+- Daily and category card pools are cached in process for one hour.
+- The API prewarms popular card feeds in a background loop.
+- Engagement normalization and clustering reduce the amount of content sent to the summarization model.
+- The mobile client uses longer timeouts for digest, podcast, and text-to-speech routes to accommodate cold starts.
+- Access and refresh tokens are persisted locally so returning users can restore a session.
+
+## Architecture Details
 
 ## Requirements
 
